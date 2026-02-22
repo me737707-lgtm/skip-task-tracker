@@ -1,0 +1,365 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Skip Task Tracker</title>
+    
+    <style>
+        /* General Reset & Body Styling */
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background-color: #1a1a2e;
+            color: #fff;
+            padding: 20px;
+        }
+
+        /* Glassmorphism Card */
+        .container {
+            background: rgba(255, 255, 255, 0.05);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 24px;
+            padding: 40px;
+            width: 100%;
+            max-width: 800px; 
+            box-shadow: 0 25px 45px rgba(0, 0, 0, 0.3);
+        }
+
+        h1 {
+            text-align: center;
+            margin-bottom: 30px;
+            font-size: 2rem;
+            font-weight: 700;
+            color: #ffffff;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        /* Form Grid Layout */
+        .form-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+
+        .full-width { grid-column: 1 / -1; }
+
+        .form-group { position: relative; }
+
+        label {
+            display: block;
+            margin-bottom: 8px;
+            font-size: 1rem;
+            color: #e0e0e0;
+            font-weight: 600;
+        }
+
+        input, select, textarea {
+            width: 100%;
+            padding: 12px 15px;
+            background: rgba(255, 255, 255, 0.08);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 8px;
+            color: #fff;
+            font-family: inherit;
+            font-size: 1rem;
+            transition: all 0.3s ease;
+            outline: none;
+        }
+
+        input:focus, select:focus, textarea:focus {
+            border-color: #4dabf7;
+            background: rgba(255, 255, 255, 0.12);
+        }
+
+        select option { background: #1a1a2e; color: #fff; }
+
+        .hidden-group { display: none; opacity: 0; transition: all 0.3s ease; }
+        .hidden-group.visible { display: block; opacity: 1; }
+
+        button {
+            width: 100%;
+            padding: 14px;
+            background: #4dabf7;
+            border: none;
+            border-radius: 8px;
+            color: #000;
+            font-family: inherit;
+            font-size: 1.1rem;
+            font-weight: 700;
+            cursor: pointer;
+            transition: background 0.2s;
+            margin-top: 10px;
+        }
+
+        button:hover { background: #74c0fc; }
+
+        #status {
+            text-align: center;
+            margin-top: 20px;
+            font-weight: 600;
+            font-size: 1.1rem;
+            min-height: 24px;
+        }
+
+        .success { color: #69db7c; }
+        .error { color: #ff6b6b; }
+        label span { color: #ff6b6b; }
+        
+        @media (max-width: 700px) {
+            .form-grid { grid-template-columns: 1fr; }
+            h1 { font-size: 1.5rem; }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <h1>Skip Task Tracker</h1>
+        
+        <form id="taskForm" autocomplete="off">
+            <div class="form-grid">
+                
+                <!-- 1. Timestamp -->
+                <div class="form-group full-width">
+                    <label for="timestamp">Timestamp</label>
+                    <input type="text" id="timestamp" name="timestamp" readonly>
+                </div>
+
+                <!-- 2. Labeler Name -->
+                <div class="form-group">
+                    <label for="labelerName">Labeler Name <span>*</span></label>
+                    <input type="text" id="labelerName" name="labelerName" placeholder="Enter name" required>
+                </div>
+
+                <!-- 3. User -->
+                <div class="form-group">
+                    <label for="user">User <span>*</span></label>
+                    <input type="text" id="user" name="user" placeholder="Enter username" required>
+                </div>
+
+                <!-- 4. QC Name -->
+                <div class="form-group">
+                    <label for="qcName">Reviewed by (QC Name) <span>*</span></label>
+                    <input type="text" id="qcName" name="qcName" placeholder="QC Name" required>
+                </div>
+
+                <!-- 5. Task Link -->
+                <div class="form-group">
+                    <label for="taskLink">Task Link <span>*</span></label>
+                    <input type="url" id="taskLink" name="taskLink" placeholder="Paste full link here" required>
+                </div>
+
+                <!-- 6. Task ID -->
+                <div class="form-group">
+                    <label for="taskId">Task ID <span>*</span></label>
+                    <input type="text" id="taskId" name="taskId" placeholder="Auto-filled ID" required>
+                </div>
+
+                <!-- 7. Task Type -->
+                <div class="form-group">
+                    <label for="taskType">Task Type <span>*</span></label>
+                    <select id="taskType" name="taskType" required>
+                        <option value="" disabled selected>Select Type...</option>
+                        <option value="LIDAR">LIDAR</option>
+                        <option value="Lane Line">Lane Line</option>
+                        <option value="Image">Image</option>
+                        <option value="Image segmentation">Image segmentation</option>
+                    </select>
+                </div>
+
+                <!-- NEW: Queue Name -->
+                <div class="form-group">
+                    <label for="queueName">Queue Name <span>*</span></label>
+                    <select id="queueName" name="queueName" required>
+                        <option value="" disabled selected>Select Queue...</option>
+                        <option value="sc3_full_scene_highway_mapless_filtered_3d_lanes">sc3_full_scene_highway_mapless_filtered_3d_lanes</option>
+                        <option value="sc3_full_scene_highway_lanes_first_lidar_labeling">sc3_full_scene_highway_lanes_first_lidar_labeling</option>
+                        <option value="sc3_full_scene_highway_lidar_only_labeling">sc3_full_scene_highway_lidar_only_labeling</option>
+                    </select>
+                </div>
+
+                <!-- NEW: Modality -->
+                <div class="form-group">
+                    <label for="modality">Modality <span>*</span></label>
+                    <select id="modality" name="modality" required>
+                        <option value="" disabled selected>Select Modality...</option>
+                        <option value="LIDAR FP">LIDAR FP</option>
+                        <option value="LIDAR QA">LIDAR QA</option>
+                        <option value="Image FP">Image FP</option>
+                        <option value="Image QA">Image QA</option>
+                        <option value="Relabeling FP">Relabeling FP</option>
+                        <option value="Relabeling QA">Relabeling QA</option>
+                    </select>
+                </div>
+
+                <!-- 8. Pass -->
+                <div class="form-group">
+                    <label for="passStatus">Pass <span>*</span></label>
+                    <select id="passStatus" name="passStatus" required>
+                        <option value="" disabled selected>Select Status...</option>
+                        <option value="FP">FP</option>
+                        <option value="QA">QA</option>
+                    </select>
+                </div>
+
+                <!-- 9. Issue -->
+                <div class="form-group full-width">
+                    <label for="issue">Issue <span>*</span></label>
+                    <select id="issue" name="issue" required>
+                        <option value="" disabled selected>Select an issue...</option>
+                        <option value="Edge Case">Edge Case</option>
+                        <option value="Not a freeway">Not a freeway</option>
+                        <option value="Camera projection issue">Camera projection issue</option>
+                        <option value="Lidar points shifting vertically">Lidar points shifting vertically</option>
+                        <option value="Degraded lidar returns">Degraded lidar returns</option>
+                    </select>
+                </div>
+
+                <!-- 10. Issued Frames -->
+                <div class="form-group full-width hidden-group" id="issuedFramesGroup">
+                    <label for="issuedFrames">Issued Frames <span>*</span></label>
+                    <input type="text" id="issuedFrames" name="issuedFrames" placeholder="e.g., 100-150">
+                </div>
+
+                <div class="full-width">
+                    <button type="submit">Submit Report</button>
+                </div>
+            </div>
+        </form>
+
+        <p id="status"></p>
+    </div>
+
+    <script>
+        const API_URL = "https://script.google.com/macros/s/AKfycbxABnVBg2c7T-h6Yx93pc9IlOW5G6h4jg-NCdH-WXa4DTJ1J-VeOfp88ssYZB4-tA_h4A/exec";
+
+        const form = document.getElementById('taskForm');
+        const issueSelect = document.getElementById('issue');
+        const issuedFramesGroup = document.getElementById('issuedFramesGroup');
+        const issuedFramesInput = document.getElementById('issuedFrames');
+        const timestampInput = document.getElementById('timestamp');
+        const statusPara = document.getElementById('status');
+        const taskLinkInput = document.getElementById('taskLink');
+        const taskIdInput = document.getElementById('taskId');
+
+        // 1. Timestamp
+        function setTimestamp() {
+            const now = new Date();
+            const options = {
+                timeZone: "Africa/Cairo",
+                year: 'numeric', month: '2-digit', day: '2-digit',
+                hour: '2-digit', minute: '2-digit', second: '2-digit',
+                hour12: true
+            };
+            timestampInput.value = now.toLocaleString('en-US', options).replace(',', '');
+        }
+        setTimestamp();
+        setInterval(setTimestamp, 1000);
+
+        // 2. Show/Hide Issued Frames
+        issueSelect.addEventListener('change', function() {
+            if (this.value === 'Lidar points shifting vertically') {
+                issuedFramesGroup.classList.add('visible');
+                issuedFramesInput.setAttribute('required', 'required');
+            } else {
+                issuedFramesGroup.classList.remove('visible');
+                issuedFramesInput.removeAttribute('required');
+                issuedFramesInput.value = ''; 
+            }
+        });
+
+        // 3. Auto-fill Task ID
+        taskLinkInput.addEventListener('input', function() {
+            const url = this.value;
+            const match = url.match(/\/id\/(\d+)/);
+            if (match && match[1]) {
+                taskIdInput.value = match[1];
+            }
+        });
+
+        // 4. Clean Link (FINAL FIX)
+        function cleanTaskLink(url) {
+            try {
+                url = url.trim();
+                
+                // استخراج الـ ID
+                const idMatch = url.match(/(\d+)/);
+                if (!idMatch) return url;
+                const id = idMatch[0];
+
+                // استخراج اسم المشروع باستخدام Regex أدق
+                // بيبحث عن أي حروف بين /do/ و /id/
+                const projectMatch = url.match(/\/do\/([^\/]+)\/id\//);
+
+                let finalProject = "SellIvandarQA"; // الفallback
+
+                if (projectMatch && projectMatch[1]) {
+                    finalProject = projectMatch[1]; // الاسم اللي اتلقاه
+                }
+
+                // طباعة في الـ Console للتأكد (افتح F12 لتشوفها)
+                console.log("Detected Project:", finalProject);
+
+                // بناء اللينك النهائي
+                return `https://labeling.robot.car/#/tasks/do/${finalProject}/id/${id}`;
+
+            } catch (e) {
+                console.error("Error:", e);
+                return url;
+            }
+        }
+
+        // 5. Submit
+        form.addEventListener('submit', async function(e) {
+            e.preventDefault();
+
+            if (issueSelect.value === 'Lidar points shifting vertically' && !issuedFramesInput.value) {
+                statusPara.className = 'error';
+                statusPara.textContent = 'Error: Issued Frames are required.';
+                return;
+            }
+
+            // تنظيف اللينك قبل الإرسال
+            const cleanedLink = cleanTaskLink(taskLinkInput.value);
+            console.log("Sending Link:", cleanedLink); // للتأكد
+
+            const formData = new FormData(form);
+            formData.set('taskLink', cleanedLink);
+            
+            const data = Object.fromEntries(formData.entries());
+            statusPara.className = '';
+            statusPara.textContent = 'Submitting...';
+
+            try {
+                const res = await fetch(API_URL, {
+                    method: "POST",
+                    headers: { "Content-Type": "text/plain;charset=utf-8" }, 
+                    body: JSON.stringify(data)
+                });
+                const json = await res.json();
+                if (!json.ok) throw new Error(json.error);
+
+                statusPara.className = 'success';
+                statusPara.textContent = 'Task submitted successfully ✅';
+                setTimeout(() => {
+                    form.reset(); setTimestamp();
+                    issuedFramesGroup.classList.remove('visible');
+                    statusPara.textContent = '';
+                }, 2500);
+            } catch (err) {
+                statusPara.className = 'error';
+                statusPara.textContent = 'Failed ❌: ' + err.message;
+            }
+        });
+    </script>
+</body>
+</html>
