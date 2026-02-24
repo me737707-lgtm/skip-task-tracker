@@ -82,8 +82,15 @@
 
         select option { background: #1a1a2e; color: #fff; }
 
-        .hidden-group { display: none; opacity: 0; transition: all 0.3s ease; }
-        .hidden-group.visible { display: block; opacity: 1; }
+        .hidden-group { display: none; opacity: 0; max-height: 0; overflow: hidden; transition: all 0.3s ease; }
+        .hidden-group.visible { display: block; opacity: 1; max-height: 200px; }
+
+        /* تنسيق الـ Frames Container */
+        .frames-container {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+        }
 
         button {
             width: 100%;
@@ -117,6 +124,7 @@
         @media (max-width: 700px) {
             .form-grid { grid-template-columns: 1fr; }
             h1 { font-size: 1.5rem; }
+            .frames-container { grid-template-columns: 1fr; }
         }
     </style>
 </head>
@@ -140,10 +148,11 @@
                     <input type="text" id="labelerName" name="labelerName" placeholder="Enter name" required>
                 </div>
 
-                <!-- 3. User -->
+                <!-- 3. User (هيتبعت بالتنسيق الجديد) -->
                 <div class="form-group">
-                    <label for="user">User <span>*</span></label>
-                    <input type="text" id="user" name="user" placeholder="Enter username" required>
+                    <label for="userInput">User <span>*</span></label>
+                    <input type="text" id="userInput" name="userInput" placeholder="e.g. me538539 or 538539" required>
+                    <small style="color:#aaa; font-size:0.8rem;">Will be saved as: mexxxxx@meti.ai</small>
                 </div>
 
                 <!-- 4. QC Name -->
@@ -176,7 +185,7 @@
                     </select>
                 </div>
 
-                <!-- NEW: Queue Name -->
+                <!-- 8. Queue Name -->
                 <div class="form-group">
                     <label for="queueName">Queue Name <span>*</span></label>
                     <select id="queueName" name="queueName" required>
@@ -187,7 +196,7 @@
                     </select>
                 </div>
 
-                <!-- NEW: Modality -->
+                <!-- 9. Modality -->
                 <div class="form-group">
                     <label for="modality">Modality <span>*</span></label>
                     <select id="modality" name="modality" required>
@@ -201,7 +210,7 @@
                     </select>
                 </div>
 
-                <!-- 8. Pass -->
+                <!-- 10. Pass -->
                 <div class="form-group">
                     <label for="passStatus">Pass <span>*</span></label>
                     <select id="passStatus" name="passStatus" required>
@@ -211,7 +220,7 @@
                     </select>
                 </div>
 
-                <!-- 9. Issue -->
+                <!-- 11. Issue -->
                 <div class="form-group full-width">
                     <label for="issue">Issue <span>*</span></label>
                     <select id="issue" name="issue" required>
@@ -224,10 +233,19 @@
                     </select>
                 </div>
 
-                <!-- 10. Issued Frames -->
+                <!-- 12. Issued Frames (Modified Layout) -->
                 <div class="form-group full-width hidden-group" id="issuedFramesGroup">
-                    <label for="issuedFrames">Issued Frames <span>*</span></label>
-                    <input type="text" id="issuedFrames" name="issuedFrames" placeholder="e.g., 100-150">
+                    <label>Issued Frames <span>*</span></label>
+                    <div class="frames-container">
+                        <div class="form-group">
+                            <label style="font-size:0.9rem; color:#4dabf7;">From Frame</label>
+                            <input type="number" id="frameStart" placeholder="e.g. 100">
+                        </div>
+                        <div class="form-group">
+                            <label style="font-size:0.9rem; color:#4dabf7;">To Frame</label>
+                            <input type="number" id="frameEnd" placeholder="e.g. 150">
+                        </div>
+                    </div>
                 </div>
 
                 <div class="full-width">
@@ -245,11 +263,13 @@
         const form = document.getElementById('taskForm');
         const issueSelect = document.getElementById('issue');
         const issuedFramesGroup = document.getElementById('issuedFramesGroup');
-        const issuedFramesInput = document.getElementById('issuedFrames');
+        const frameStartInput = document.getElementById('frameStart');
+        const frameEndInput = document.getElementById('frameEnd');
         const timestampInput = document.getElementById('timestamp');
         const statusPara = document.getElementById('status');
         const taskLinkInput = document.getElementById('taskLink');
         const taskIdInput = document.getElementById('taskId');
+        const userInput = document.getElementById('userInput'); // اليوزر الجديد
 
         // 1. Timestamp
         function setTimestamp() {
@@ -269,73 +289,120 @@
         issueSelect.addEventListener('change', function() {
             if (this.value === 'Lidar points shifting vertically') {
                 issuedFramesGroup.classList.add('visible');
-                issuedFramesInput.setAttribute('required', 'required');
+                frameStartInput.setAttribute('required', 'required');
+                frameEndInput.setAttribute('required', 'required');
             } else {
                 issuedFramesGroup.classList.remove('visible');
-                issuedFramesInput.removeAttribute('required');
-                issuedFramesInput.value = ''; 
+                frameStartInput.removeAttribute('required');
+                frameEndInput.removeAttribute('required');
+                frameStartInput.value = ''; 
+                frameEndInput.value = ''; 
             }
         });
 
-        // 3. Auto-fill Task ID
+        // 3. Auto-fill Task ID & Fix Link Logic
         taskLinkInput.addEventListener('input', function() {
             const url = this.value;
+            // التعديل هنا: بنبحث عن الأرقام اللي بعد /id/ بس
             const match = url.match(/\/id\/(\d+)/);
+            
             if (match && match[1]) {
                 taskIdInput.value = match[1];
             }
         });
 
-        // 4. Clean Link (FINAL FIX)
+        // 4. User Formatting Function
+        function formatUser(rawUser) {
+            if (!rawUser) return "";
+            
+            // 1. نحول الحروف لـ lowercase
+            let user = rawUser.toLowerCase().trim();
+            
+            // 2. لو اليوزر كاتب "me" في الأول، نشيلها عشان نظبط الشكل
+            if (user.startsWith("me")) {
+                user = user.substring(2);
+            }
+            
+            // 3. نتأكد إن الباقي أرقام (نشيل أي حروف تانية لو موجودة بالغلط)
+            // هنا بنفترض إن المدخل الصحيح هي الأرقام
+            const digits = user.replace(/\D/g, '');
+            
+            // 4. نبني الشكل النهائي
+            if (digits) {
+                return `me${digits}@meti.ai`;
+            }
+            return rawUser; // لو حصل حاجة غريبة نرجعه زي هو
+        }
+
+        // 5. Clean Link Function
         function cleanTaskLink(url) {
             try {
                 url = url.trim();
                 
-                // استخراج الـ ID
-                const idMatch = url.match(/(\d+)/);
-                if (!idMatch) return url;
-                const id = idMatch[0];
+                // نستخرج الـ ID اللي بعد /id/ (عدلنا الريجكس هنا برده)
+                const idMatch = url.match(/\/id\/(\d+)/);
+                if (!idMatch) return url; // لو ملقيناش رقم يبقى نرجع اللينك زي هو
+                const id = idMatch[1];
 
-                // استخراج اسم المشروع باستخدام Regex أدق
-                // بيبحث عن أي حروف بين /do/ و /id/
-                const projectMatch = url.match(/\/do\/([^\/]+)\/id\//);
-
-                let finalProject = "SellIvandarQA"; // الفallback
+                // نستخرج اسم المشروع
+                const projectMatch = url.match(/\/do\/([^/]+)\/id\//);
+                let finalProject = "SellIvandarQA"; // الفول باك
 
                 if (projectMatch && projectMatch[1]) {
-                    finalProject = projectMatch[1]; // الاسم اللي اتلقاه
+                    finalProject = projectMatch[1];
                 }
 
-                // طباعة في الـ Console للتأكد (افتح F12 لتشوفها)
-                console.log("Detected Project:", finalProject);
-
-                // بناء اللينك النهائي
                 return `https://labeling.robot.car/#/tasks/do/${finalProject}/id/${id}`;
 
             } catch (e) {
-                console.error("Error:", e);
                 return url;
             }
         }
 
-        // 5. Submit
+        // 6. Submit
         form.addEventListener('submit', async function(e) {
             e.preventDefault();
 
-            if (issueSelect.value === 'Lidar points shifting vertically' && !issuedFramesInput.value) {
-                statusPara.className = 'error';
-                statusPara.textContent = 'Error: Issued Frames are required.';
-                return;
+            // Validation for Frames
+            if (issueSelect.value === 'Lidar points shifting vertically') {
+                if (!frameStartInput.value || !frameEndInput.value) {
+                    statusPara.className = 'error';
+                    statusPara.textContent = 'Error: Please enter both Start and End frames.';
+                    return;
+                }
             }
 
-            // تنظيف اللينك قبل الإرسال
-            const cleanedLink = cleanTaskLink(taskLinkInput.value);
-            console.log("Sending Link:", cleanedLink); // للتأكد
-
+            // تجهيز البيانات
             const formData = new FormData(form);
-            formData.set('taskLink', cleanedLink);
             
-            const data = Object.fromEntries(formData.entries());
+            // 1. تنظيف وتجهيز اليوزر
+            const finalUser = formatUser(userInput.value);
+            
+            // 2. تنظيف اللينك
+            const finalLink = cleanTaskLink(taskLinkInput.value);
+
+            // 3. تجهيز نص الفريمات
+            let finalFrames = "";
+            if (issueSelect.value === 'Lidar points shifting vertically') {
+                finalFrames = `from frame ${frameStartInput.value} to frame ${frameEndInput.value}`;
+            }
+
+            // بناء الداتا اللي هتبعت
+            const data = {
+                timestamp: formData.get('timestamp'),
+                labelerName: formData.get('labelerName'),
+                user: finalUser, // اليوزر بعد التنسيق
+                qcName: formData.get('qcName'),
+                taskLink: finalLink, // اللينك بعد التنظيف
+                taskId: formData.get('taskId'),
+                taskType: formData.get('taskType'),
+                queueName: formData.get('queueName'),
+                modality: formData.get('modality'),
+                passStatus: formData.get('passStatus'),
+                issue: formData.get('issue'),
+                issuedFrames: finalFrames // النص النهائي للفريمات
+            };
+
             statusPara.className = '';
             statusPara.textContent = 'Submitting...';
 
@@ -351,7 +418,8 @@
                 statusPara.className = 'success';
                 statusPara.textContent = 'Task submitted successfully ✅';
                 setTimeout(() => {
-                    form.reset(); setTimestamp();
+                    form.reset(); 
+                    setTimestamp();
                     issuedFramesGroup.classList.remove('visible');
                     statusPara.textContent = '';
                 }, 2500);
