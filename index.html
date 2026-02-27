@@ -35,10 +35,20 @@
 
         h1 {
             text-align: center;
-            margin-bottom: 30px;
+            margin-bottom: 5px;
             font-size: 2rem;
             font-weight: 700;
             color: #ffffff;
+        }
+
+        /* تنسيق الجملة مع الايموجي */
+        .prayer-text {
+            text-align: center;
+            margin-bottom: 30px;
+            font-size: 1rem;
+            color: #cbd5e0;
+            font-weight: 600;
+            direction: rtl;
         }
 
         /* Form Grid Layout */
@@ -131,6 +141,8 @@
 
     <div class="container">
         <h1>Skip Task Tracker</h1>
+        <!-- تمت إضافة القلب الأحمر -->
+        <p class="prayer-text">❤️ ادعوا لأخونا و صحابنا علي ويكا بالرحمة والمغفرة ❤️</p>
         
         <form id="taskForm" autocomplete="off">
             <div class="form-grid">
@@ -144,14 +156,12 @@
                 <!-- 2. Labeler Name -->
                 <div class="form-group">
                     <label for="labelerName">Labeler Name <span>*</span></label>
-                    <!-- التعديل: يمسح الأرقام بس، ويخلي الحروف (عربي/انجليزي) تمشي -->
                     <input type="text" id="labelerName" name="labelerName" placeholder="Enter name (Letters only)" required oninput="this.value = this.value.replace(/[0-9]/g, '')">
                 </div>
 
                 <!-- 3. User -->
                 <div class="form-group">
                     <label for="userInput">User <span>*</span></label>
-                    <!-- التعديل: يقبل حروف وارقام (عشان يكتب me)، وبيحول الحروف لسمول، وحددنا الاقصى 8 حروف (me + 6 ارقام) -->
                     <input type="text" id="userInput" name="userInput" placeholder="e.g. me123456 or 123456" required maxlength="8" oninput="this.value = this.value.toLowerCase().replace(/[^a-z0-9]/g, '')">
                     <small>Allowed: 123456 OR me123456 (6 digits required)</small>
                 </div>
@@ -159,7 +169,6 @@
                 <!-- 4. QC Name -->
                 <div class="form-group">
                     <label for="qcName">Reviewed by (QC Name) <span>*</span></label>
-                    <!-- التعديل: يمسح الأرقام بس -->
                     <input type="text" id="qcName" name="qcName" placeholder="QC Name (Letters only)" required oninput="this.value = this.value.replace(/[0-9]/g, '')">
                 </div>
 
@@ -328,24 +337,20 @@
             return str.replace(/\b\w/g, char => char.toUpperCase());
         }
 
-        // 6. Helper: Format User (Logic Updated)
+        // 6. Helper: Format User
         function formatUser(rawUser) {
             if (!rawUser) return { valid: false, value: "" };
             
-            // Case 1: User typed "me123456"
             if (rawUser.startsWith("me")) {
                 const digits = rawUser.substring(2);
-                // Check if digits are exactly 6 numbers
                 if (/^\d{6}$/.test(digits)) {
                     return { valid: true, value: `me${digits}@meti.ai` };
                 }
             }
-            // Case 2: User typed "123456"
             else if (/^\d{6}$/.test(rawUser)) {
                  return { valid: true, value: `me${rawUser}@meti.ai` };
             }
             
-            // Otherwise invalid
             return { valid: false, value: "" };
         }
 
