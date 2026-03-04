@@ -41,7 +41,6 @@
             color: #ffffff;
         }
 
-        /* تنسيق الجملة مع الايموجي */
         .prayer-text {
             text-align: center;
             margin-bottom: 30px;
@@ -82,6 +81,12 @@
             transition: all 0.3s ease;
             outline: none;
         }
+        
+        /* تنسيق خاص لـ Textarea */
+        textarea {
+            min-height: 80px;
+            resize: vertical;
+        }
 
         input:focus, select:focus, textarea:focus {
             border-color: #4dabf7;
@@ -93,7 +98,7 @@
         select option { background: #1a1a2e; color: #fff; }
 
         .hidden-group { display: none; opacity: 0; max-height: 0; overflow: hidden; transition: all 0.3s ease; }
-        .hidden-group.visible { display: block; opacity: 1; max-height: 200px; }
+        .hidden-group.visible { display: block; opacity: 1; max-height: 500px; } /* زودنا الـ max-height عشان الـ textarea */
 
         .frames-container {
             display: grid;
@@ -141,8 +146,7 @@
 
     <div class="container">
         <h1>Skip Task Tracker</h1>
-        <!-- تمت إضافة القلب الأحمر -->
-        <p class="prayer-text">❤️ ادعوا لأخونا و صحبنا علي ويكا بالرحمة والمغفرة ❤️</p>
+        <p class="prayer-text">❤️ ادعوا لأخونا علي ويكا بالرحمة والمغفرة ❤️</p>
         
         <form id="taskForm" autocomplete="off">
             <div class="form-grid">
@@ -245,7 +249,13 @@
                     </select>
                 </div>
 
-                <!-- 12. Issued Frames -->
+                <!-- 12. Edge Case Description (New) -->
+                <div class="form-group full-width hidden-group" id="edgeCaseGroup">
+                    <label for="edgeCaseDesc">Edge Case Description <span>*</span></label>
+                    <textarea id="edgeCaseDesc" name="edgeCaseDesc" placeholder="Please describe the edge case details here..."></textarea>
+                </div>
+
+                <!-- 13. Issued Frames -->
                 <div class="form-group full-width hidden-group" id="issuedFramesGroup">
                     <label>Issued Frames <span>*</span></label>
                     <div class="frames-container">
@@ -274,9 +284,16 @@
 
         const form = document.getElementById('taskForm');
         const issueSelect = document.getElementById('issue');
+        
+        // Groups
         const issuedFramesGroup = document.getElementById('issuedFramesGroup');
+        const edgeCaseGroup = document.getElementById('edgeCaseGroup');
+        
+        // Inputs
         const frameStartInput = document.getElementById('frameStart');
         const frameEndInput = document.getElementById('frameEnd');
+        const edgeCaseDescInput = document.getElementById('edgeCaseDesc');
+        
         const timestampInput = document.getElementById('timestamp');
         const statusPara = document.getElementById('status');
         const taskLinkInput = document.getElementById('taskLink');
@@ -299,18 +316,28 @@
         setTimestamp();
         setInterval(setTimestamp, 1000);
 
-        // 2. Show/Hide Issued Frames
+        // 2. Show/Hide Dynamic Fields
         issueSelect.addEventListener('change', function() {
-            if (this.value === 'Lidar points shifting vertically') {
+            const value = this.value;
+            
+            // Reset everything first
+            issuedFramesGroup.classList.remove('visible');
+            edgeCaseGroup.classList.remove('visible');
+            frameStartInput.removeAttribute('required');
+            frameEndInput.removeAttribute('required');
+            edgeCaseDescInput.removeAttribute('required');
+
+            // Logic for Lidar shifting
+            if (value === 'Lidar points shifting vertically') {
                 issuedFramesGroup.classList.add('visible');
                 frameStartInput.setAttribute('required', 'required');
                 frameEndInput.setAttribute('required', 'required');
-            } else {
-                issuedFramesGroup.classList.remove('visible');
-                frameStartInput.removeAttribute('required');
-                frameEndInput.removeAttribute('required');
-                frameStartInput.value = ''; 
-                frameEndInput.value = ''; 
+            }
+            
+            // Logic for Edge Case
+            if (value === 'Edge Case') {
+                edgeCaseGroup.classList.add('visible');
+                edgeCaseDescInput.setAttribute('required', 'required');
             }
         });
 
@@ -405,7 +432,7 @@
                 return;
             }
 
-            // 4. Frames
+            // 4. Frames Validation
             if (issueSelect.value === 'Lidar points shifting vertically') {
                 const start = parseInt(frameStartInput.value);
                 const end = parseInt(frameEndInput.value);
@@ -422,6 +449,13 @@
                 }
             }
 
+            // 5. Edge Case Validation
+            if (issueSelect.value === 'Edge Case' && !edgeCaseDescInput.value.trim()) {
+                statusPara.className = 'error';
+                statusPara.textContent = 'Error: Please describe the edge case.';
+                return;
+            }
+
             // Data Preparation
             const formData = new FormData(form);
             
@@ -429,6 +463,12 @@
             const finalQcName = formatNameCase(qcVal);
             const finalUser = userResult.value;
             const finalLink = cleanTaskLink(taskLinkInput.value);
+
+            // Handle Issue Text
+            let finalIssue = formData.get('issue');
+            if (finalIssue === 'Edge Case') {
+                finalIssue = `Edge Case: ${edgeCaseDescInput.value.trim()}`;
+            }
 
             let finalFrames = "";
             if (issueSelect.value === 'Lidar points shifting vertically') {
@@ -446,7 +486,7 @@
                 queueName: formData.get('queueName'),
                 modality: formData.get('modality'),
                 passStatus: formData.get('passStatus'),
-                issue: formData.get('issue'),
+                issue: finalIssue, // Isssue contains the description now
                 issuedFrames: finalFrames
             };
 
@@ -468,6 +508,7 @@
                     form.reset(); 
                     setTimestamp();
                     issuedFramesGroup.classList.remove('visible');
+                    edgeCaseGroup.classList.remove('visible');
                     statusPara.textContent = '';
                 }, 2500);
             } catch (err) {
