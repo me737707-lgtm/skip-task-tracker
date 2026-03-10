@@ -82,7 +82,6 @@
             outline: none;
         }
         
-        /* تنسيق خاص لـ Textarea */
         textarea {
             min-height: 80px;
             resize: vertical;
@@ -98,7 +97,7 @@
         select option { background: #1a1a2e; color: #fff; }
 
         .hidden-group { display: none; opacity: 0; max-height: 0; overflow: hidden; transition: all 0.3s ease; }
-        .hidden-group.visible { display: block; opacity: 1; max-height: 500px; } /* زودنا الـ max-height عشان الـ textarea */
+        .hidden-group.visible { display: block; opacity: 1; max-height: 500px; }
 
         .frames-container {
             display: grid;
@@ -245,11 +244,10 @@
                         <option value="Camera projection issue">Camera projection issue</option>
                         <option value="Lidar points shifting vertically">Lidar points shifting vertically</option>
                         <option value="Degraded lidar returns">Degraded lidar returns</option>
-                        <option value="Map Issue">Map Issue</option>
                     </select>
                 </div>
 
-                <!-- 12. Edge Case Description (New) -->
+                <!-- 12. Edge Case Description -->
                 <div class="form-group full-width hidden-group" id="edgeCaseGroup">
                     <label for="edgeCaseDesc">Edge Case Description <span>*</span></label>
                     <textarea id="edgeCaseDesc" name="edgeCaseDesc" placeholder="Please describe the edge case details here..."></textarea>
@@ -320,21 +318,18 @@
         issueSelect.addEventListener('change', function() {
             const value = this.value;
             
-            // Reset everything first
             issuedFramesGroup.classList.remove('visible');
             edgeCaseGroup.classList.remove('visible');
             frameStartInput.removeAttribute('required');
             frameEndInput.removeAttribute('required');
             edgeCaseDescInput.removeAttribute('required');
 
-            // Logic for Lidar shifting
             if (value === 'Lidar points shifting vertically') {
                 issuedFramesGroup.classList.add('visible');
                 frameStartInput.setAttribute('required', 'required');
                 frameEndInput.setAttribute('required', 'required');
             }
             
-            // Logic for Edge Case
             if (value === 'Edge Case') {
                 edgeCaseGroup.classList.add('visible');
                 edgeCaseDescInput.setAttribute('required', 'required');
@@ -404,9 +399,18 @@
             }
         }
 
-        // 8. Submit
+        // 8. Helper: Check for URL (New Validation)
+        function containsUrl(text) {
+            // Regex to detect http, https, or www
+            const urlPattern = /(http|https|www\.)/i;
+            return urlPattern.test(text);
+        }
+
+        // 9. Submit
         form.addEventListener('submit', async function(e) {
             e.preventDefault();
+
+            // --- Validations ---
 
             // 1. Labeler Name
             const labelerVal = labelerNameInput.value.trim();
@@ -415,12 +419,22 @@
                 statusPara.textContent = 'Error: Labeler Name must be at least 3 letters.';
                 return;
             }
+            if (containsUrl(labelerVal)) {
+                statusPara.className = 'error';
+                statusPara.textContent = 'Error: Links are not allowed in Labeler Name.';
+                return;
+            }
 
             // 2. QC Name
             const qcVal = qcNameInput.value.trim();
             if (qcVal.length < 3) {
                 statusPara.className = 'error';
                 statusPara.textContent = 'Error: QC Name must be at least 3 letters.';
+                return;
+            }
+            if (containsUrl(qcVal)) {
+                statusPara.className = 'error';
+                statusPara.textContent = 'Error: Links are not allowed in QC Name.';
                 return;
             }
 
@@ -450,10 +464,18 @@
             }
 
             // 5. Edge Case Validation
-            if (issueSelect.value === 'Edge Case' && !edgeCaseDescInput.value.trim()) {
-                statusPara.className = 'error';
-                statusPara.textContent = 'Error: Please describe the edge case.';
-                return;
+            if (issueSelect.value === 'Edge Case') {
+                const edgeVal = edgeCaseDescInput.value.trim();
+                if (!edgeVal) {
+                    statusPara.className = 'error';
+                    statusPara.textContent = 'Error: Please describe the edge case.';
+                    return;
+                }
+                if (containsUrl(edgeVal)) {
+                    statusPara.className = 'error';
+                    statusPara.textContent = 'Error: Links are not allowed in Description.';
+                    return;
+                }
             }
 
             // Data Preparation
@@ -486,7 +508,7 @@
                 queueName: formData.get('queueName'),
                 modality: formData.get('modality'),
                 passStatus: formData.get('passStatus'),
-                issue: finalIssue, // Isssue contains the description now
+                issue: finalIssue,
                 issuedFrames: finalFrames
             };
 
