@@ -159,7 +159,8 @@
                 <!-- 2. Labeler Name -->
                 <div class="form-group">
                     <label for="labelerName">Labeler Name <span>*</span></label>
-                    <input type="text" id="labelerName" name="labelerName" placeholder="Enter name (Letters only)" required oninput="this.value = this.value.replace(/[0-9]/g, '')">
+                    <!-- التعديل: يقبل حروف انجليزية ومسافات بس (يسحب الأرقام والعربي) -->
+                    <input type="text" id="labelerName" name="labelerName" placeholder="English letters only" required oninput="this.value = this.value.replace(/[^a-zA-Z\s]/g, '')">
                 </div>
 
                 <!-- 3. User -->
@@ -172,13 +173,15 @@
                 <!-- 4. QC Name -->
                 <div class="form-group">
                     <label for="qcName">Reviewed by (QC Name) <span>*</span></label>
-                    <input type="text" id="qcName" name="qcName" placeholder="QC Name (Letters only)" required oninput="this.value = this.value.replace(/[0-9]/g, '')">
+                    <!-- التعديل: يقبل حروف انجليزية ومسافات بس -->
+                    <input type="text" id="qcName" name="qcName" placeholder="English letters only" required oninput="this.value = this.value.replace(/[^a-zA-Z\s]/g, '')">
                 </div>
 
                 <!-- 5. Task Link -->
                 <div class="form-group">
                     <label for="taskLink">Task Link <span>*</span></label>
-                    <input type="url" id="taskLink" name="taskLink" placeholder="Paste full link here" required>
+                    <input type="url" id="taskLink" name="taskLink" placeholder="Paste labeling link here" required>
+                    <small>Must be a valid labeling.robot.car link</small>
                 </div>
 
                 <!-- 6. Task ID -->
@@ -399,9 +402,8 @@
             }
         }
 
-        // 8. Helper: Check for URL (New Validation)
+        // 8. Helper: Check for URL
         function containsUrl(text) {
-            // Regex to detect http, https, or www
             const urlPattern = /(http|https|www\.)/i;
             return urlPattern.test(text);
         }
@@ -412,11 +414,12 @@
 
             // --- Validations ---
 
-            // 1. Labeler Name
+            // 1. Labeler Name (English Only)
             const labelerVal = labelerNameInput.value.trim();
-            if (labelerVal.length < 3) {
+            // التشييك ده بيأكد إن مفيش حروف عربي أو أرقام حتى لو لصقهم
+            if (labelerVal.length < 3 || /[^a-zA-Z\s]/.test(labelerVal)) {
                 statusPara.className = 'error';
-                statusPara.textContent = 'Error: Labeler Name must be at least 3 letters.';
+                statusPara.textContent = 'Error: Labeler Name must be at least 3 English letters.';
                 return;
             }
             if (containsUrl(labelerVal)) {
@@ -425,11 +428,11 @@
                 return;
             }
 
-            // 2. QC Name
+            // 2. QC Name (English Only)
             const qcVal = qcNameInput.value.trim();
-            if (qcVal.length < 3) {
+            if (qcVal.length < 3 || /[^a-zA-Z\s]/.test(qcVal)) {
                 statusPara.className = 'error';
-                statusPara.textContent = 'Error: QC Name must be at least 3 letters.';
+                statusPara.textContent = 'Error: QC Name must be at least 3 English letters.';
                 return;
             }
             if (containsUrl(qcVal)) {
@@ -446,7 +449,16 @@
                 return;
             }
 
-            // 4. Frames Validation
+            // 4. Task Link (Strict Validation)
+            const taskLinkVal = taskLinkInput.value.trim();
+            // شرط إن اللينك يبدأ بـ labeling.robot.car
+            if (!taskLinkVal.startsWith("https://labeling.robot.car/#/tasks/do/")) {
+                statusPara.className = 'error';
+                statusPara.textContent = 'Error: Invalid Task Link. Please use the correct labeling link.';
+                return;
+            }
+
+            // 5. Frames Validation
             if (issueSelect.value === 'Lidar points shifting vertically') {
                 const start = parseInt(frameStartInput.value);
                 const end = parseInt(frameEndInput.value);
@@ -463,7 +475,7 @@
                 }
             }
 
-            // 5. Edge Case Validation
+            // 6. Edge Case Validation
             if (issueSelect.value === 'Edge Case') {
                 const edgeVal = edgeCaseDescInput.value.trim();
                 if (!edgeVal) {
@@ -484,7 +496,7 @@
             const finalLabelerName = formatNameCase(labelerVal);
             const finalQcName = formatNameCase(qcVal);
             const finalUser = userResult.value;
-            const finalLink = cleanTaskLink(taskLinkInput.value);
+            const finalLink = cleanTaskLink(taskLinkVal); // Cleaning happens after validation
 
             // Handle Issue Text
             let finalIssue = formData.get('issue');
