@@ -159,7 +159,6 @@
                 <!-- 2. Labeler Name -->
                 <div class="form-group">
                     <label for="labelerName">Labeler Name <span>*</span></label>
-                    <!-- التعديل: يقبل حروف انجليزية ومسافات بس (يسحب الأرقام والعربي) -->
                     <input type="text" id="labelerName" name="labelerName" placeholder="English letters only" required oninput="this.value = this.value.replace(/[^a-zA-Z\s]/g, '')">
                 </div>
 
@@ -173,7 +172,6 @@
                 <!-- 4. QC Name -->
                 <div class="form-group">
                     <label for="qcName">Reviewed by (QC Name) <span>*</span></label>
-                    <!-- التعديل: يقبل حروف انجليزية ومسافات بس -->
                     <input type="text" id="qcName" name="qcName" placeholder="English letters only" required oninput="this.value = this.value.replace(/[^a-zA-Z\s]/g, '')">
                 </div>
 
@@ -207,7 +205,6 @@
                     <label for="queueName">Queue Name <span>*</span></label>
                     <select id="queueName" name="queueName" required>
                         <option value="" disabled selected>Select Queue...</option>
-                         <option value="sc3_full_scene_lane_lidar_parallel_labeling">sc3_full_scene_lane_lidar_parallel_labeling</option>
                         <option value="sc3_full_scene_highway_mapless_filtered_3d_lanes">sc3_full_scene_highway_mapless_filtered_3d_lanes</option>
                         <option value="sc3_full_scene_highway_lanes_first_lidar_labeling">sc3_full_scene_highway_lanes_first_lidar_labeling</option>
                         <option value="sc3_full_scene_highway_lidar_only_labeling">sc3_full_scene_highway_lidar_only_labeling</option>
@@ -219,8 +216,6 @@
                     <label for="modality">Modality <span>*</span></label>
                     <select id="modality" name="modality" required>
                         <option value="" disabled selected>Select Modality...</option>
-                        <option value="Lane Line FP">Lane Line FP</option>
-                        <option value="Lane Line QA">Lane Line QA</option>
                         <option value="LIDAR FP">LIDAR FP</option>
                         <option value="LIDAR QA">LIDAR QA</option>
                         <option value="Image FP">Image FP</option>
@@ -250,6 +245,7 @@
                         <option value="Camera projection issue">Camera projection issue</option>
                         <option value="Lidar points shifting vertically">Lidar points shifting vertically</option>
                         <option value="Degraded lidar returns">Degraded lidar returns</option>
+                        <option value="Other">Other</option> <!-- الجديد -->
                     </select>
                 </div>
 
@@ -259,7 +255,23 @@
                     <textarea id="edgeCaseDesc" name="edgeCaseDesc" placeholder="Please describe the edge case details here..."></textarea>
                 </div>
 
-                <!-- 13. Issued Frames -->
+                <!-- 13. Other Sub-Selection (New) -->
+                <div class="form-group full-width hidden-group" id="otherSubGroup">
+                    <label for="otherSubIssue">Select Other Type <span>*</span></label>
+                    <select id="otherSubIssue" name="otherSubIssue">
+                        <option value="" disabled selected>Select specific type...</option>
+                        <option value="Lidar Shift Horizontally">Lidar Shift Horizontally</option>
+                        <option value="Other Reason">Other</option>
+                    </select>
+                </div>
+
+                <!-- 14. Other Reason Description (New) -->
+                <div class="form-group full-width hidden-group" id="otherReasonGroup">
+                    <label for="otherReasonDesc">Reason Description <span>*</span></label>
+                    <textarea id="otherReasonDesc" name="otherReasonDesc" placeholder="Please describe the reason here..."></textarea>
+                </div>
+
+                <!-- 15. Issued Frames -->
                 <div class="form-group full-width hidden-group" id="issuedFramesGroup">
                     <label>Issued Frames <span>*</span></label>
                     <div class="frames-container">
@@ -292,11 +304,15 @@
         // Groups
         const issuedFramesGroup = document.getElementById('issuedFramesGroup');
         const edgeCaseGroup = document.getElementById('edgeCaseGroup');
+        const otherSubGroup = document.getElementById('otherSubGroup'); // New
+        const otherReasonGroup = document.getElementById('otherReasonGroup'); // New
         
         // Inputs
         const frameStartInput = document.getElementById('frameStart');
         const frameEndInput = document.getElementById('frameEnd');
         const edgeCaseDescInput = document.getElementById('edgeCaseDesc');
+        const otherSubIssueSelect = document.getElementById('otherSubIssue'); // New
+        const otherReasonDescInput = document.getElementById('otherReasonDesc'); // New
         
         const timestampInput = document.getElementById('timestamp');
         const statusPara = document.getElementById('status');
@@ -320,29 +336,60 @@
         setTimestamp();
         setInterval(setTimestamp, 1000);
 
-        // 2. Show/Hide Dynamic Fields
-        issueSelect.addEventListener('change', function() {
-            const value = this.value;
-            
+        // Helper: Hide All Dynamic Groups
+        function hideAllDynamicGroups() {
             issuedFramesGroup.classList.remove('visible');
             edgeCaseGroup.classList.remove('visible');
+            otherSubGroup.classList.remove('visible');
+            otherReasonGroup.classList.remove('visible');
+
+            // Remove required attributes
             frameStartInput.removeAttribute('required');
             frameEndInput.removeAttribute('required');
             edgeCaseDescInput.removeAttribute('required');
+            otherReasonDescInput.removeAttribute('required');
+        }
+
+        // 2. Main Issue Change Logic
+        issueSelect.addEventListener('change', function() {
+            hideAllDynamicGroups();
+            const value = this.value;
 
             if (value === 'Lidar points shifting vertically') {
                 issuedFramesGroup.classList.add('visible');
                 frameStartInput.setAttribute('required', 'required');
                 frameEndInput.setAttribute('required', 'required');
-            }
-            
-            if (value === 'Edge Case') {
+            } else if (value === 'Edge Case') {
                 edgeCaseGroup.classList.add('visible');
                 edgeCaseDescInput.setAttribute('required', 'required');
+            } else if (value === 'Other') {
+                otherSubGroup.classList.add('visible');
+                // We don't set required here yet, wait for sub-selection
             }
         });
 
-        // 3. Frame Validation (Live)
+        // 3. Other Sub-Selection Change Logic (New)
+        otherSubIssueSelect.addEventListener('change', function() {
+            // Hide sub-options first
+            issuedFramesGroup.classList.remove('visible');
+            otherReasonGroup.classList.remove('visible');
+            frameStartInput.removeAttribute('required');
+            frameEndInput.removeAttribute('required');
+            otherReasonDescInput.removeAttribute('required');
+
+            const subValue = this.value;
+
+            if (subValue === 'Lidar Shift Horizontally') {
+                issuedFramesGroup.classList.add('visible');
+                frameStartInput.setAttribute('required', 'required');
+                frameEndInput.setAttribute('required', 'required');
+            } else if (subValue === 'Other Reason') {
+                otherReasonGroup.classList.add('visible');
+                otherReasonDescInput.setAttribute('required', 'required');
+            }
+        });
+
+        // 4. Frame Validation (Live)
         function validateFrame(input) {
             input.value = input.value.replace(/\D/g, '');
             if (input.value.length > 3) {
@@ -350,7 +397,7 @@
             }
         }
 
-        // 4. Auto-fill Task ID
+        // 5. Auto-fill Task ID
         taskLinkInput.addEventListener('input', function() {
             const url = this.value;
             const match = url.match(/\/id\/(\d+)/);
@@ -359,14 +406,14 @@
             }
         });
 
-        // 5. Helper: Format Name
+        // 6. Helper: Format Name
         function formatNameCase(str) {
             if (!str) return "";
             str = str.toLowerCase();
             return str.replace(/\b\w/g, char => char.toUpperCase());
         }
 
-        // 6. Helper: Format User
+        // 7. Helper: Format User
         function formatUser(rawUser) {
             if (!rawUser) return { valid: false, value: "" };
             
@@ -383,7 +430,7 @@
             return { valid: false, value: "" };
         }
 
-        // 7. Clean Link
+        // 8. Clean Link
         function cleanTaskLink(url) {
             try {
                 url = url.trim();
@@ -405,21 +452,20 @@
             }
         }
 
-        // 8. Helper: Check for URL
+        // 9. Helper: Check for URL
         function containsUrl(text) {
             const urlPattern = /(http|https|www\.)/i;
             return urlPattern.test(text);
         }
 
-        // 9. Submit
+        // 10. Submit
         form.addEventListener('submit', async function(e) {
             e.preventDefault();
 
             // --- Validations ---
 
-            // 1. Labeler Name (English Only)
+            // 1. Labeler Name
             const labelerVal = labelerNameInput.value.trim();
-            // التشييك ده بيأكد إن مفيش حروف عربي أو أرقام حتى لو لصقهم
             if (labelerVal.length < 3 || /[^a-zA-Z\s]/.test(labelerVal)) {
                 statusPara.className = 'error';
                 statusPara.textContent = 'Error: Labeler Name must be at least 3 English letters.';
@@ -431,7 +477,7 @@
                 return;
             }
 
-            // 2. QC Name (English Only)
+            // 2. QC Name
             const qcVal = qcNameInput.value.trim();
             if (qcVal.length < 3 || /[^a-zA-Z\s]/.test(qcVal)) {
                 statusPara.className = 'error';
@@ -452,17 +498,17 @@
                 return;
             }
 
-            // 4. Task Link (Strict Validation)
+            // 4. Task Link
             const taskLinkVal = taskLinkInput.value.trim();
-            // شرط إن اللينك يبدأ بـ labeling.robot.car
             if (!taskLinkVal.startsWith("https://labeling.robot.car/#/tasks/do/")) {
                 statusPara.className = 'error';
                 statusPara.textContent = 'Error: Invalid Task Link. Please use the correct labeling link.';
                 return;
             }
 
-            // 5. Frames Validation
-            if (issueSelect.value === 'Lidar points shifting vertically') {
+            // 5. Frames Validation (Used by two different issues)
+            // We check visibility to see if we need to validate
+            if (issuedFramesGroup.classList.contains('visible')) {
                 const start = parseInt(frameStartInput.value);
                 const end = parseInt(frameEndInput.value);
 
@@ -479,7 +525,7 @@
             }
 
             // 6. Edge Case Validation
-            if (issueSelect.value === 'Edge Case') {
+            if (edgeCaseGroup.classList.contains('visible')) {
                 const edgeVal = edgeCaseDescInput.value.trim();
                 if (!edgeVal) {
                     statusPara.className = 'error';
@@ -493,22 +539,53 @@
                 }
             }
 
+            // 7. Other Reason Validation (New)
+            if (otherReasonGroup.classList.contains('visible')) {
+                const reasonVal = otherReasonDescInput.value.trim();
+                if (!reasonVal) {
+                    statusPara.className = 'error';
+                    statusPara.textContent = 'Error: Please describe the reason.';
+                    return;
+                }
+                if (containsUrl(reasonVal)) {
+                    statusPara.className = 'error';
+                    statusPara.textContent = 'Error: Links are not allowed in Description.';
+                    return;
+                }
+            }
+            
+            // 8. Ensure sub-selection is made if "Other" is chosen
+            if (issueSelect.value === 'Other' && !otherSubIssueSelect.value) {
+                statusPara.className = 'error';
+                statusPara.textContent = 'Error: Please select a specific type for Other.';
+                return;
+            }
+
             // Data Preparation
             const formData = new FormData(form);
             
             const finalLabelerName = formatNameCase(labelerVal);
             const finalQcName = formatNameCase(qcVal);
             const finalUser = userResult.value;
-            const finalLink = cleanTaskLink(taskLinkVal); // Cleaning happens after validation
+            const finalLink = cleanTaskLink(taskLinkVal);
 
-            // Handle Issue Text
+            // Handle Issue Text Construction
             let finalIssue = formData.get('issue');
+            
             if (finalIssue === 'Edge Case') {
                 finalIssue = `Edge Case: ${edgeCaseDescInput.value.trim()}`;
+            } else if (finalIssue === 'Other') {
+                const subIssue = otherSubIssueSelect.value;
+                if (subIssue === 'Lidar Shift Horizontally') {
+                    finalIssue = "Other: Lidar Shift Horizontally";
+                } else if (subIssue === 'Other Reason') {
+                    finalIssue = `Other: ${otherReasonDescInput.value.trim()}`;
+                }
             }
 
             let finalFrames = "";
-            if (issueSelect.value === 'Lidar points shifting vertically') {
+            // Frames are visible either for "Lidar points shifting vertically" or "Lidar Shift Horizontally"
+            if (issuedFramesGroup.classList.contains('visible')) {
                 finalFrames = `from frame ${frameStartInput.value} to frame ${frameEndInput.value}`;
             }
 
@@ -544,8 +621,7 @@
                 setTimeout(() => {
                     form.reset(); 
                     setTimestamp();
-                    issuedFramesGroup.classList.remove('visible');
-                    edgeCaseGroup.classList.remove('visible');
+                    hideAllDynamicGroups(); // Hide all groups on reset
                     statusPara.textContent = '';
                 }, 2500);
             } catch (err) {
