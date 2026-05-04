@@ -238,7 +238,7 @@
                     </select>
                 </div>
 
-                <!-- 11. Issue -->
+                <!-- 11. Issue (Modified) -->
                 <div class="form-group full-width">
                     <label for="issue">Issue <span>*</span></label>
                     <select id="issue" name="issue" required>
@@ -246,9 +246,11 @@
                         <option value="Edge Case">Edge Case</option>
                         <option value="Not a freeway">Not a freeway</option>
                         <option value="Camera projection issue">Camera projection issue</option>
-                        <option value="Lidar points shifting vertically">Lidar points shifting vertically</option>
                         <option value="Degraded lidar returns">Degraded lidar returns</option>
-                        <option value="Other">Other</option> <!-- الجديد -->
+                        <!-- 1. تم إضافة Lidar Shift Horizontally هنا كاختيار مستقل -->
+                        <option value="Lidar Shift Horizontally">Lidar Shift Horizontally</option>
+                        <!-- 2. تم حذف Vertical من هنا -->
+                        <option value="Other">Other</option>
                     </select>
                 </div>
 
@@ -258,17 +260,18 @@
                     <textarea id="edgeCaseDesc" name="edgeCaseDesc" placeholder="Please describe the edge case details here..."></textarea>
                 </div>
 
-                <!-- 13. Other Sub-Selection (New) -->
+                <!-- 13. Other Sub-Selection (Modified) -->
                 <div class="form-group full-width hidden-group" id="otherSubGroup">
                     <label for="otherSubIssue">Select Other Type <span>*</span></label>
                     <select id="otherSubIssue" name="otherSubIssue">
                         <option value="" disabled selected>Select specific type...</option>
-                        <option value="Lidar Shift Horizontally">Lidar Shift Horizontally</option>
-                        <option value="Other Reason">Other</option>
+                        <!-- 2. تم نقل Vertical هنا داخل Other -->
+                        <option value="Lidar points shifting vertically">Lidar Points Shift Vertically</option>
+                        <option value="Other Reason">Other Reason</option>
                     </select>
                 </div>
 
-                <!-- 14. Other Reason Description (New) -->
+                <!-- 14. Other Reason Description -->
                 <div class="form-group full-width hidden-group" id="otherReasonGroup">
                     <label for="otherReasonDesc">Reason Description <span>*</span></label>
                     <textarea id="otherReasonDesc" name="otherReasonDesc" placeholder="Please describe the reason here..."></textarea>
@@ -307,15 +310,15 @@
         // Groups
         const issuedFramesGroup = document.getElementById('issuedFramesGroup');
         const edgeCaseGroup = document.getElementById('edgeCaseGroup');
-        const otherSubGroup = document.getElementById('otherSubGroup'); // New
-        const otherReasonGroup = document.getElementById('otherReasonGroup'); // New
+        const otherSubGroup = document.getElementById('otherSubGroup');
+        const otherReasonGroup = document.getElementById('otherReasonGroup');
         
         // Inputs
         const frameStartInput = document.getElementById('frameStart');
         const frameEndInput = document.getElementById('frameEnd');
         const edgeCaseDescInput = document.getElementById('edgeCaseDesc');
-        const otherSubIssueSelect = document.getElementById('otherSubIssue'); // New
-        const otherReasonDescInput = document.getElementById('otherReasonDesc'); // New
+        const otherSubIssueSelect = document.getElementById('otherSubIssue');
+        const otherReasonDescInput = document.getElementById('otherReasonDesc');
         
         const timestampInput = document.getElementById('timestamp');
         const statusPara = document.getElementById('status');
@@ -346,7 +349,6 @@
             otherSubGroup.classList.remove('visible');
             otherReasonGroup.classList.remove('visible');
 
-            // Remove required attributes
             frameStartInput.removeAttribute('required');
             frameEndInput.removeAttribute('required');
             edgeCaseDescInput.removeAttribute('required');
@@ -358,7 +360,8 @@
             hideAllDynamicGroups();
             const value = this.value;
 
-            if (value === 'Lidar points shifting vertically') {
+            // تعديل: تفعيل الفريمات للاختيار الجديد Lidar Shift Horizontally
+            if (value === 'Lidar Shift Horizontally') {
                 issuedFramesGroup.classList.add('visible');
                 frameStartInput.setAttribute('required', 'required');
                 frameEndInput.setAttribute('required', 'required');
@@ -367,11 +370,10 @@
                 edgeCaseDescInput.setAttribute('required', 'required');
             } else if (value === 'Other') {
                 otherSubGroup.classList.add('visible');
-                // We don't set required here yet, wait for sub-selection
             }
         });
 
-        // 3. Other Sub-Selection Change Logic (New)
+        // 3. Other Sub-Selection Change Logic
         otherSubIssueSelect.addEventListener('change', function() {
             // Hide sub-options first
             issuedFramesGroup.classList.remove('visible');
@@ -382,7 +384,8 @@
 
             const subValue = this.value;
 
-            if (subValue === 'Lidar Shift Horizontally') {
+            // تعديل: تفعيل الفريمات للاختيار Vertical الذي اصبح داخل Other
+            if (subValue === 'Lidar points shifting vertically') {
                 issuedFramesGroup.classList.add('visible');
                 frameStartInput.setAttribute('required', 'required');
                 frameEndInput.setAttribute('required', 'required');
@@ -509,8 +512,7 @@
                 return;
             }
 
-            // 5. Frames Validation (Used by two different issues)
-            // We check visibility to see if we need to validate
+            // 5. Frames Validation
             if (issuedFramesGroup.classList.contains('visible')) {
                 const start = parseInt(frameStartInput.value);
                 const end = parseInt(frameEndInput.value);
@@ -542,7 +544,7 @@
                 }
             }
 
-            // 7. Other Reason Validation (New)
+            // 7. Other Reason Validation
             if (otherReasonGroup.classList.contains('visible')) {
                 const reasonVal = otherReasonDescInput.value.trim();
                 if (!reasonVal) {
@@ -579,15 +581,15 @@
                 finalIssue = `Edge Case: ${edgeCaseDescInput.value.trim()}`;
             } else if (finalIssue === 'Other') {
                 const subIssue = otherSubIssueSelect.value;
-                if (subIssue === 'Lidar Shift Horizontally') {
-                    finalIssue = "Other: Lidar Shift Horizontally";
+                if (subIssue === 'Lidar points shifting vertically') {
+                    finalIssue = "Other: Lidar Points Shift Vertically";
                 } else if (subIssue === 'Other Reason') {
                     finalIssue = `Other: ${otherReasonDescInput.value.trim()}`;
                 }
             }
+            // Lidar Shift Horizontally stays as is (Independent Option)
 
             let finalFrames = "";
-            // Frames are visible either for "Lidar points shifting vertically" or "Lidar Shift Horizontally"
             if (issuedFramesGroup.classList.contains('visible')) {
                 finalFrames = `from frame ${frameStartInput.value} to frame ${frameEndInput.value}`;
             }
@@ -624,7 +626,7 @@
                 setTimeout(() => {
                     form.reset(); 
                     setTimestamp();
-                    hideAllDynamicGroups(); // Hide all groups on reset
+                    hideAllDynamicGroups();
                     statusPara.textContent = '';
                 }, 2500);
             } catch (err) {
