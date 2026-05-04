@@ -31,6 +31,8 @@
             width: 100%;
             max-width: 800px; 
             box-shadow: 0 25px 45px rgba(0, 0, 0, 0.3);
+            position: relative; /* Added for z-index context if needed */
+            z-index: 1;
         }
 
         h1 {
@@ -139,6 +141,83 @@
             h1 { font-size: 1.5rem; }
             .frames-container { grid-template-columns: 1fr; }
         }
+
+        /* --- Custom Modal Styles (New) --- */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.7);
+            backdrop-filter: blur(5px);
+            display: none; /* Hidden by default */
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+        }
+
+        .modal-content {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(15px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            padding: 30px;
+            border-radius: 20px;
+            max-width: 500px;
+            width: 90%;
+            text-align: center;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+            animation: popIn 0.3s ease-out;
+        }
+
+        @keyframes popIn {
+            from { transform: scale(0.8); opacity: 0; }
+            to { transform: scale(1); opacity: 1; }
+        }
+
+        .modal-content h2 {
+            color: #69db7c;
+            margin-bottom: 20px;
+        }
+
+        .message-box {
+            background: rgba(0, 0, 0, 0.3);
+            padding: 15px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            font-size: 1.1rem;
+            word-wrap: break-word;
+            border: 1px solid rgba(255,255,255,0.1);
+            color: #e0e0e0;
+            font-weight: 600;
+            text-align: center;
+        }
+
+        .modal-buttons {
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+        }
+
+        .modal-btn {
+            padding: 10px 20px;
+            border-radius: 8px;
+            font-weight: bold;
+            cursor: pointer;
+            border: none;
+            font-size: 1rem;
+            width: auto; /* Override default button width */
+        }
+
+        .btn-copy {
+            background: #69db7c;
+            color: #000;
+        }
+
+        .btn-close {
+            background: #ff6b6b;
+            color: #fff;
+        }
     </style>
 </head>
 <body>
@@ -238,7 +317,7 @@
                     </select>
                 </div>
 
-                <!-- 11. Issue (Modified) -->
+                <!-- 11. Issue -->
                 <div class="form-group full-width">
                     <label for="issue">Issue <span>*</span></label>
                     <select id="issue" name="issue" required>
@@ -247,9 +326,7 @@
                         <option value="Not a freeway">Not a freeway</option>
                         <option value="Camera projection issue">Camera projection issue</option>
                         <option value="Degraded lidar returns">Degraded lidar returns</option>
-                        <!-- 1. تم إضافة Lidar Shift Horizontally هنا كاختيار مستقل -->
                         <option value="Lidar Shift Horizontally">Lidar Shift Horizontally</option>
-                        <!-- 2. تم حذف Vertical من هنا -->
                         <option value="Other">Other</option>
                     </select>
                 </div>
@@ -260,12 +337,11 @@
                     <textarea id="edgeCaseDesc" name="edgeCaseDesc" placeholder="Please describe the edge case details here..."></textarea>
                 </div>
 
-                <!-- 13. Other Sub-Selection (Modified) -->
+                <!-- 13. Other Sub-Selection -->
                 <div class="form-group full-width hidden-group" id="otherSubGroup">
                     <label for="otherSubIssue">Select Other Type <span>*</span></label>
                     <select id="otherSubIssue" name="otherSubIssue">
                         <option value="" disabled selected>Select specific type...</option>
-                        <!-- 2. تم نقل Vertical هنا داخل Other -->
                         <option value="Lidar points shifting vertically">Lidar Points Shift Vertically</option>
                         <option value="Other Reason">Other Reason</option>
                     </select>
@@ -301,6 +377,19 @@
         <p id="status"></p>
     </div>
 
+    <!-- Custom Modal HTML (New) -->
+    <div id="customModal" class="modal-overlay">
+        <div class="modal-content">
+            <h2>Task Submitted ✅</h2>
+            <p style="margin-bottom: 10px; font-size: 0.9rem; color:#aaa;">Please copy the message below to GULP description box:</p>
+            <div id="modalMessage" class="message-box"></div>
+            <div class="modal-buttons">
+                <button class="modal-btn btn-copy" onclick="copyModalMessage()">Copy Message</button>
+                <button class="modal-btn btn-close" onclick="closeModal()">Close</button>
+            </div>
+        </div>
+    </div>
+
     <script>
         const API_URL = "https://script.google.com/macros/s/AKfycbxABnVBg2c7T-h6Yx93pc9IlOW5G6h4jg-NCdH-WXa4DTJ1J-VeOfp88ssYZB4-tA_h4A/exec";
 
@@ -327,6 +416,10 @@
         const userInput = document.getElementById('userInput');
         const labelerNameInput = document.getElementById('labelerName');
         const qcNameInput = document.getElementById('qcName');
+
+        // Modal Elements
+        const customModal = document.getElementById('customModal');
+        const modalMessage = document.getElementById('modalMessage');
 
         // 1. Timestamp
         function setTimestamp() {
@@ -360,7 +453,6 @@
             hideAllDynamicGroups();
             const value = this.value;
 
-            // تعديل: تفعيل الفريمات للاختيار الجديد Lidar Shift Horizontally
             if (value === 'Lidar Shift Horizontally') {
                 issuedFramesGroup.classList.add('visible');
                 frameStartInput.setAttribute('required', 'required');
@@ -375,7 +467,6 @@
 
         // 3. Other Sub-Selection Change Logic
         otherSubIssueSelect.addEventListener('change', function() {
-            // Hide sub-options first
             issuedFramesGroup.classList.remove('visible');
             otherReasonGroup.classList.remove('visible');
             frameStartInput.removeAttribute('required');
@@ -384,7 +475,6 @@
 
             const subValue = this.value;
 
-            // تعديل: تفعيل الفريمات للاختيار Vertical الذي اصبح داخل Other
             if (subValue === 'Lidar points shifting vertically') {
                 issuedFramesGroup.classList.add('visible');
                 frameStartInput.setAttribute('required', 'required');
@@ -464,12 +554,64 @@
             return urlPattern.test(text);
         }
 
+        // --- Modal Functions (New) ---
+        function showModal(message) {
+            modalMessage.innerText = message;
+            customModal.style.display = 'flex';
+        }
+
+        function closeModal() {
+            customModal.style.display = 'none';
+        }
+
+        function copyModalMessage() {
+            const text = modalMessage.innerText;
+            navigator.clipboard.writeText(text).then(() => {
+                // Visual feedback
+                const btn = document.querySelector('.btn-copy');
+                const originalText = btn.innerText;
+                btn.innerText = "Copied!";
+                btn.style.background = "#4dabf7";
+                setTimeout(() => {
+                    btn.innerText = originalText;
+                    btn.style.background = "#69db7c";
+                }, 1500);
+            }).catch(err => {
+                alert("Failed to copy text.");
+            });
+        }
+
+        // Helper: Get GULP Message based on Logic
+        function getGulpMessage() {
+            const issueVal = issueSelect.value;
+            const start = frameStartInput.value;
+            const end = frameEndInput.value;
+
+            if (issueVal === "Degraded lidar returns") {
+                return "The lidar that is having the issue";
+            } 
+            else if (issueVal === "Lidar Shift Horizontally") {
+                return `Lidar Shift Horizontally from ${start} to ${end}`;
+            } 
+            else if (issueVal === "Edge Case") {
+                return "Waiting to responde";
+            } 
+            else if (issueVal === "Other") {
+                const subVal = otherSubIssueSelect.value;
+                if (subVal === "Lidar points shifting vertically") {
+                    return `Lidar Shift Vertically from ${start} to ${end}`;
+                }
+            }
+            
+            // Default return if no specific message rule matches (though user requested specific ones)
+            return "Task Submitted Successfully";
+        }
+
         // 10. Submit
         form.addEventListener('submit', async function(e) {
             e.preventDefault();
 
             // --- Validations ---
-
             // 1. Labeler Name
             const labelerVal = labelerNameInput.value.trim();
             if (labelerVal.length < 3 || /[^a-zA-Z\s]/.test(labelerVal)) {
@@ -587,7 +729,6 @@
                     finalIssue = `Other: ${otherReasonDescInput.value.trim()}`;
                 }
             }
-            // Lidar Shift Horizontally stays as is (Independent Option)
 
             let finalFrames = "";
             if (issuedFramesGroup.classList.contains('visible')) {
@@ -621,14 +762,20 @@
                 const json = await res.json();
                 if (!json.ok) throw new Error(json.error);
 
-                statusPara.className = 'success';
-                statusPara.textContent = 'Task submitted successfully ✅';
-                setTimeout(() => {
-                    form.reset(); 
-                    setTimestamp();
-                    hideAllDynamicGroups();
-                    statusPara.textContent = '';
-                }, 2500);
+                // --- Success Actions ---
+                
+                // 1. Prepare the specific message for the modal
+                const messageToShow = getGulpMessage();
+
+                // 2. Show the modal instead of simple status text
+                showModal(messageToShow);
+
+                // 3. Reset form
+                form.reset(); 
+                setTimestamp();
+                hideAllDynamicGroups();
+                statusPara.textContent = '';
+
             } catch (err) {
                 statusPara.className = 'error';
                 statusPara.textContent = 'Failed ❌: ' + err.message;
