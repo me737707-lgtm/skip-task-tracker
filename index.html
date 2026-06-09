@@ -31,7 +31,7 @@
             width: 100%;
             max-width: 800px; 
             box-shadow: 0 25px 45px rgba(0, 0, 0, 0.3);
-            position: relative; /* Added for z-index context if needed */
+            position: relative;
             z-index: 1;
         }
 
@@ -142,7 +142,7 @@
             .frames-container { grid-template-columns: 1fr; }
         }
 
-        /* --- Custom Modal Styles (New) --- */
+        /* --- Custom Modal Styles --- */
         .modal-overlay {
             position: fixed;
             top: 0;
@@ -151,7 +151,7 @@
             height: 100%;
             background: rgba(0, 0, 0, 0.7);
             backdrop-filter: blur(5px);
-            display: none; /* Hidden by default */
+            display: none;
             justify-content: center;
             align-items: center;
             z-index: 1000;
@@ -206,7 +206,7 @@
             cursor: pointer;
             border: none;
             font-size: 1rem;
-            width: auto; /* Override default button width */
+            width: auto;
         }
 
         .btn-copy {
@@ -219,6 +219,7 @@
             color: #fff;
         }
     </style>
+<base target="_blank">
 </head>
 <body>
 
@@ -323,7 +324,7 @@
                     <label for="issue">Issue <span>*</span></label>
                     <select id="issue" name="issue" required>
                         <option value="" disabled selected>Select an issue...</option>
-                        <option value="Edge Case">Edge Case</option>
+                        <option value="edge case">edge case</option>
                         <option value="Not a freeway">Not a freeway</option>
                         <option value="Camera projection issue">Camera projection issue</option>
                         <option value="Degraded lidar returns">Degraded lidar returns</option>
@@ -332,9 +333,20 @@
                     </select>
                 </div>
 
-                <!-- 12. Edge Case Description -->
+                <!-- 12. Edge Case Sub-Issue & Description -->
                 <div class="form-group full-width hidden-group" id="edgeCaseGroup">
-                    <label for="edgeCaseDesc">Edge Case Description <span>*</span></label>
+                    <label for="edgeCaseSubIssue">Edge Case Type <span>*</span></label>
+                    <select id="edgeCaseSubIssue" name="edgeCaseSubIssue">
+                        <option value="" disabled selected>Select edge case type...</option>
+                        <option value="waiting for response">waiting for response</option>
+                        <option value="edge case">edge case</option>
+                        <option value="missed information">missed information</option>
+                        <option value="Tool issue">Tool issue</option>
+                        <option value="Map issue">Map issue</option>
+                        <option value="Other">Other (specify below)</option>
+                    </select>
+                    
+                    <label for="edgeCaseDesc" style="margin-top: 15px;">Edge Case Description <span id="edgeCaseDescRequired" style="display:none;">*</span></label>
                     <textarea id="edgeCaseDesc" name="edgeCaseDesc" placeholder="Please describe the edge case details here..."></textarea>
                 </div>
 
@@ -378,7 +390,7 @@
         <p id="status"></p>
     </div>
 
-    <!-- Custom Modal HTML (New) -->
+    <!-- Custom Modal HTML -->
     <div id="customModal" class="modal-overlay">
         <div class="modal-content">
             <h2>Task Submitted ✅</h2>
@@ -407,6 +419,8 @@
         const frameStartInput = document.getElementById('frameStart');
         const frameEndInput = document.getElementById('frameEnd');
         const edgeCaseDescInput = document.getElementById('edgeCaseDesc');
+        const edgeCaseSubIssueSelect = document.getElementById('edgeCaseSubIssue');
+        const edgeCaseDescRequired = document.getElementById('edgeCaseDescRequired');
         const otherSubIssueSelect = document.getElementById('otherSubIssue');
         const otherReasonDescInput = document.getElementById('otherReasonDesc');
         
@@ -447,6 +461,8 @@
             frameEndInput.removeAttribute('required');
             edgeCaseDescInput.removeAttribute('required');
             otherReasonDescInput.removeAttribute('required');
+            edgeCaseSubIssueSelect.removeAttribute('required');
+            edgeCaseDescRequired.style.display = 'none';
         }
 
         // 2. Main Issue Change Logic
@@ -458,11 +474,22 @@
                 issuedFramesGroup.classList.add('visible');
                 frameStartInput.setAttribute('required', 'required');
                 frameEndInput.setAttribute('required', 'required');
-            } else if (value === 'Edge Case') {
+            } else if (value === 'edge case') {
                 edgeCaseGroup.classList.add('visible');
-                edgeCaseDescInput.setAttribute('required', 'required');
+                edgeCaseSubIssueSelect.setAttribute('required', 'required');
             } else if (value === 'Other') {
                 otherSubGroup.classList.add('visible');
+            }
+        });
+
+        // Edge Case Sub-Issue Change Logic
+        edgeCaseSubIssueSelect.addEventListener('change', function() {
+            if (this.value === 'Other') {
+                edgeCaseDescInput.setAttribute('required', 'required');
+                edgeCaseDescRequired.style.display = 'inline';
+            } else {
+                edgeCaseDescInput.removeAttribute('required');
+                edgeCaseDescRequired.style.display = 'none';
             }
         });
 
@@ -555,7 +582,7 @@
             return urlPattern.test(text);
         }
 
-        // --- Modal Functions (New) ---
+        // --- Modal Functions ---
         function showModal(message) {
             modalMessage.innerText = message;
             customModal.style.display = 'flex';
@@ -568,7 +595,6 @@
         function copyModalMessage() {
             const text = modalMessage.innerText;
             navigator.clipboard.writeText(text).then(() => {
-                // Visual feedback
                 const btn = document.querySelector('.btn-copy');
                 const originalText = btn.innerText;
                 btn.innerText = "Copied!";
@@ -594,8 +620,12 @@
             else if (issueVal === "Lidar Shift Horizontally") {
                 return `Lidar Shift Horizontally from ${start} to ${end}`;
             } 
-            else if (issueVal === "Edge Case") {
-                return "Waiting to responde";
+            else if (issueVal === "edge case") {
+                const subVal = edgeCaseSubIssueSelect.value;
+                if (subVal === 'Other') {
+                    return edgeCaseDescInput.value.trim() || "edge case";
+                }
+                return subVal || "edge case";
             } 
             else if (issueVal === "Other") {
                 const subVal = otherSubIssueSelect.value;
@@ -604,7 +634,6 @@
                 }
             }
             
-            // Default return if no specific message rule matches (though user requested specific ones)
             return "Task Submitted Successfully";
         }
 
@@ -674,16 +703,23 @@
 
             // 6. Edge Case Validation
             if (edgeCaseGroup.classList.contains('visible')) {
-                const edgeVal = edgeCaseDescInput.value.trim();
-                if (!edgeVal) {
+                if (!edgeCaseSubIssueSelect.value) {
                     statusPara.className = 'error';
-                    statusPara.textContent = 'Error: Please describe the edge case.';
+                    statusPara.textContent = 'Error: Please select an edge case type.';
                     return;
                 }
-                if (containsUrl(edgeVal)) {
-                    statusPara.className = 'error';
-                    statusPara.textContent = 'Error: Links are not allowed in Description.';
-                    return;
+                if (edgeCaseSubIssueSelect.value === 'Other') {
+                    const edgeVal = edgeCaseDescInput.value.trim();
+                    if (!edgeVal) {
+                        statusPara.className = 'error';
+                        statusPara.textContent = 'Error: Please describe the edge case.';
+                        return;
+                    }
+                    if (containsUrl(edgeVal)) {
+                        statusPara.className = 'error';
+                        statusPara.textContent = 'Error: Links are not allowed in Description.';
+                        return;
+                    }
                 }
             }
 
@@ -720,8 +756,14 @@
             // Handle Issue Text Construction
             let finalIssue = formData.get('issue');
             
-            if (finalIssue === 'Edge Case') {
-                finalIssue = `Edge Case: ${edgeCaseDescInput.value.trim()}`;
+            if (finalIssue === 'edge case') {
+                const subIssue = edgeCaseSubIssueSelect.value;
+                const desc = edgeCaseDescInput.value.trim();
+                if (subIssue === 'Other') {
+                    finalIssue = `edge case: ${desc}`;
+                } else {
+                    finalIssue = `edge case: ${subIssue}`;
+                }
             } else if (finalIssue === 'Other') {
                 const subIssue = otherSubIssueSelect.value;
                 if (subIssue === 'Lidar points shifting vertically') {
