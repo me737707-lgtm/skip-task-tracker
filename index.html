@@ -621,11 +621,7 @@
                 return `Lidar Shift Horizontally from ${start} to ${end}`;
             } 
             else if (issueVal === "edge case") {
-                const subVal = edgeCaseSubIssueSelect.value;
-                if (subVal === 'Other') {
-                    return edgeCaseDescInput.value.trim() || "edge case";
-                }
-                return subVal || "edge case";
+                return "edge case";
             } 
             else if (issueVal === "Other") {
                 const subVal = otherSubIssueSelect.value;
