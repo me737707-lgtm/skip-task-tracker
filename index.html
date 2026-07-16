@@ -775,6 +775,9 @@
                 finalFrames = `from frame ${frameStartInput.value} to frame ${frameEndInput.value}`;
             }
 
+            // ==================== التعديل هنا ====================
+            // بنضيف الحقل الجديد edgeCaseDesc في الـ Data Payload
+            // ====================================================
             const data = {
                 timestamp: formData.get('timestamp'),
                 labelerName: finalLabelerName,
@@ -787,7 +790,8 @@
                 modality: formData.get('modality'),
                 passStatus: formData.get('passStatus'),
                 issue: finalIssue,
-                issuedFrames: finalFrames
+                issuedFrames: finalFrames,
+                edgeCaseDesc: edgeCaseDescInput.value.trim() || ""  // <-- الحقل الجديد
             };
 
             statusPara.className = '';
