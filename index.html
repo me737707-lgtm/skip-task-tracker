@@ -1,830 +1,596 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Skip Task Tracker</title>
-    
-    <style>
-        /* General Reset & Body Styling */
-        * { box-sizing: border-box; margin: 0; padding: 0; }
-
-        body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            min-height: 100vh;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            background-color: #1a1a2e;
-            color: #fff;
-            padding: 20px;
-        }
-
-        /* Glassmorphism Card */
-        .container {
-            background: rgba(255, 255, 255, 0.05);
-            backdrop-filter: blur(10px);
-            -webkit-backdrop-filter: blur(10px);
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            border-radius: 24px;
-            padding: 40px;
-            width: 100%;
-            max-width: 800px; 
-            box-shadow: 0 25px 45px rgba(0, 0, 0, 0.3);
-            position: relative;
-            z-index: 1;
-        }
-
-        h1 {
-            text-align: center;
-            margin-bottom: 5px;
-            font-size: 2rem;
-            font-weight: 700;
-            color: #ffffff;
-        }
-
-        .prayer-text {
-            text-align: center;
-            margin-bottom: 30px;
-            font-size: 1rem;
-            color: #cbd5e0;
-            font-weight: 600;
-            direction: rtl;
-        }
-
-        /* Form Grid Layout */
-        .form-grid {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 20px;
-        }
-
-        .full-width { grid-column: 1 / -1; }
-
-        .form-group { position: relative; }
-
-        label {
-            display: block;
-            margin-bottom: 8px;
-            font-size: 1rem;
-            color: #e0e0e0;
-            font-weight: 600;
-        }
-
-        input, select, textarea {
-            width: 100%;
-            padding: 12px 15px;
-            background: rgba(255, 255, 255, 0.08);
-            border: 1px solid rgba(255, 255, 255, 0.2);
-            border-radius: 8px;
-            color: #fff;
-            font-family: inherit;
-            font-size: 1rem;
-            transition: all 0.3s ease;
-            outline: none;
-        }
-        
-        textarea {
-            min-height: 80px;
-            resize: vertical;
-        }
-
-        input:focus, select:focus, textarea:focus {
-            border-color: #4dabf7;
-            background: rgba(255, 255, 255, 0.12);
-        }
-        
-        small { color: #aaa; font-size: 0.8rem; display: block; margin-top: 5px; }
-
-        select option { background: #1a1a2e; color: #fff; }
-
-        .hidden-group { display: none; opacity: 0; max-height: 0; overflow: hidden; transition: all 0.3s ease; }
-        .hidden-group.visible { display: block; opacity: 1; max-height: 500px; }
-
-        .frames-container {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 15px;
-        }
-
-        button {
-            width: 100%;
-            padding: 14px;
-            background: #4dabf7;
-            border: none;
-            border-radius: 8px;
-            color: #000;
-            font-family: inherit;
-            font-size: 1.1rem;
-            font-weight: 700;
-            cursor: pointer;
-            transition: background 0.2s;
-            margin-top: 10px;
-        }
-
-        button:hover { background: #74c0fc; }
-
-        #status {
-            text-align: center;
-            margin-top: 20px;
-            font-weight: 600;
-            font-size: 1.1rem;
-            min-height: 24px;
-        }
-
-        .success { color: #69db7c; }
-        .error { color: #ff6b6b; }
-        label span { color: #ff6b6b; }
-        
-        @media (max-width: 700px) {
-            .form-grid { grid-template-columns: 1fr; }
-            h1 { font-size: 1.5rem; }
-            .frames-container { grid-template-columns: 1fr; }
-        }
-
-        /* --- Custom Modal Styles --- */
-        .modal-overlay {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(0, 0, 0, 0.7);
-            backdrop-filter: blur(5px);
-            display: none;
-            justify-content: center;
-            align-items: center;
-            z-index: 1000;
-        }
-
-        .modal-content {
-            background: rgba(255, 255, 255, 0.1);
-            backdrop-filter: blur(15px);
-            border: 1px solid rgba(255, 255, 255, 0.2);
-            padding: 30px;
-            border-radius: 20px;
-            max-width: 500px;
-            width: 90%;
-            text-align: center;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
-            animation: popIn 0.3s ease-out;
-        }
-
-        @keyframes popIn {
-            from { transform: scale(0.8); opacity: 0; }
-            to { transform: scale(1); opacity: 1; }
-        }
-
-        .modal-content h2 {
-            color: #69db7c;
-            margin-bottom: 20px;
-        }
-
-        .message-box {
-            background: rgba(0, 0, 0, 0.3);
-            padding: 15px;
-            border-radius: 10px;
-            margin-bottom: 20px;
-            font-size: 1.1rem;
-            word-wrap: break-word;
-            border: 1px solid rgba(255,255,255,0.1);
-            color: #e0e0e0;
-            font-weight: 600;
-            text-align: center;
-        }
-
-        .modal-buttons {
-            display: flex;
-            gap: 10px;
-            justify-content: center;
-        }
-
-        .modal-btn {
-            padding: 10px 20px;
-            border-radius: 8px;
-            font-weight: bold;
-            cursor: pointer;
-            border: none;
-            font-size: 1rem;
-            width: auto;
-        }
-
-        .btn-copy {
-            background: #69db7c;
-            color: #000;
-        }
-
-        .btn-close {
-            background: #ff6b6b;
-            color: #fff;
-        }
-    </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Skip Task Tracker</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  min-height: 100vh;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  background-color: #1a1a2e;
+  color: #fff;
+  padding: 20px;
+}
+.container {
+  background: rgba(255, 255, 255, 0.05);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 24px;
+  padding: 40px;
+  width: 100%;
+  max-width: 800px;
+  box-shadow: 0 25px 45px rgba(0, 0, 0, 0.3);
+  position: relative;
+  z-index: 1;
+}
+h1 { text-align: center; margin-bottom: 5px; font-size: 2rem; font-weight: 700; color: #ffffff; }
+.prayer-text { text-align: center; margin-bottom: 30px; font-size: 1rem; color: #cbd5e0; font-weight: 600; direction: rtl; }
+.form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+.full-width { grid-column: 1 / -1; }
+.form-group { position: relative; }
+label { display: block; margin-bottom: 8px; font-size: 1rem; color: #e0e0e0; font-weight: 600; }
+input, select, textarea {
+  width: 100%;
+  padding: 12px 15px;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 8px;
+  color: #fff;
+  font-family: inherit;
+  font-size: 1rem;
+  transition: all 0.3s ease;
+  outline: none;
+}
+textarea { min-height: 80px; resize: vertical; }
+input:focus, select:focus, textarea:focus { border-color: #4dabf7; background: rgba(255, 255, 255, 0.12); }
+small { color: #aaa; font-size: 0.8rem; display: block; margin-top: 5px; }
+select option { background: #1a1a2e; color: #fff; }
+.hidden-group { display: none; opacity: 0; max-height: 0; overflow: hidden; transition: all 0.3s ease; }
+.hidden-group.visible { display: block; opacity: 1; max-height: 500px; }
+.frames-container { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
+button {
+  width: 100%;
+  padding: 14px;
+  background: #4dabf7;
+  border: none;
+  border-radius: 8px;
+  color: #000;
+  font-family: inherit;
+  font-size: 1.1rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 0.2s;
+  margin-top: 10px;
+}
+button:hover { background: #74c0fc; }
+button:disabled { background: #3a7ca8; cursor: not-allowed; opacity: 0.7; }
+#status { text-align: center; margin-top: 20px; font-weight: 600; font-size: 1.1rem; min-height: 24px; }
+.success { color: #69db7c; }
+.error { color: #ff6b6b; }
+label span { color: #ff6b6b; }
+@media (max-width: 700px) {
+  .form-grid { grid-template-columns: 1fr; }
+  h1 { font-size: 1.5rem; }
+  .frames-container { grid-template-columns: 1fr; }
+}
+.modal-overlay {
+  position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+  background: rgba(0, 0, 0, 0.7);
+  backdrop-filter: blur(5px);
+  display: none; justify-content: center; align-items: center;
+  z-index: 1000;
+}
+.modal-content {
+  background: rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(15px);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  padding: 30px; border-radius: 20px;
+  max-width: 500px; width: 90%;
+  text-align: center;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+  animation: popIn 0.3s ease-out;
+}
+@keyframes popIn { from { transform: scale(0.8); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+.modal-content h2 { color: #69db7c; margin-bottom: 20px; }
+.message-box {
+  background: rgba(0, 0, 0, 0.3);
+  padding: 15px; border-radius: 10px; margin-bottom: 20px;
+  font-size: 1.1rem; word-wrap: break-word;
+  border: 1px solid rgba(255,255,255,0.1);
+  color: #e0e0e0; font-weight: 600; text-align: center;
+}
+.modal-buttons { display: flex; gap: 10px; justify-content: center; }
+.modal-btn { padding: 10px 20px; border-radius: 8px; font-weight: bold; cursor: pointer; border: none; font-size: 1rem; width: auto; }
+.btn-copy { background: #69db7c; color: #000; }
+.btn-close { background: #ff6b6b; color: #fff; }
+</style>
 <base target="_blank">
 </head>
 <body>
-
-    <div class="container">
-        <h1>Skip Task Tracker</h1>
-        <p class="prayer-text">❤️ ادعوا لأخونا علي ويكا بالرحمة والمغفرة ❤️</p>
-        
-        <form id="taskForm" autocomplete="off">
-            <div class="form-grid">
-                
-                <!-- 1. Timestamp -->
-                <div class="form-group full-width">
-                    <label for="timestamp">Timestamp</label>
-                    <input type="text" id="timestamp" name="timestamp" readonly>
-                </div>
-
-                <!-- 2. Labeler Name -->
-                <div class="form-group">
-                    <label for="labelerName">Labeler Name <span>*</span></label>
-                    <input type="text" id="labelerName" name="labelerName" placeholder="English letters only" required oninput="this.value = this.value.replace(/[^a-zA-Z\s]/g, '')">
-                </div>
-
-                <!-- 3. User -->
-                <div class="form-group">
-                    <label for="userInput">User <span>*</span></label>
-                    <input type="text" id="userInput" name="userInput" placeholder="e.g. me123456 or 123456" required maxlength="8" oninput="this.value = this.value.toLowerCase().replace(/[^a-z0-9]/g, '')">
-                    <small>Allowed: 123456 OR me123456 (6 digits required)</small>
-                </div>
-
-                <!-- 4. QC Name -->
-                <div class="form-group">
-                    <label for="qcName">Reviewed by (QC Name) <span>*</span></label>
-                    <input type="text" id="qcName" name="qcName" placeholder="English letters only" required oninput="this.value = this.value.replace(/[^a-zA-Z\s]/g, '')">
-                </div>
-
-                <!-- 5. Task Link -->
-                <div class="form-group">
-                    <label for="taskLink">Task Link <span>*</span></label>
-                    <input type="url" id="taskLink" name="taskLink" placeholder="Paste labeling link here" required>
-                    <small>Must be a valid labeling.robot.car link</small>
-                </div>
-
-                <!-- 6. Task ID -->
-                <div class="form-group">
-                    <label for="taskId">Task ID <span>*</span></label>
-                    <input type="text" id="taskId" name="taskId" placeholder="Auto-filled ID" required>
-                </div>
-
-                <!-- 7. Task Type -->
-                <div class="form-group">
-                    <label for="taskType">Task Type <span>*</span></label>
-                    <select id="taskType" name="taskType" required>
-                        <option value="" disabled selected>Select Type...</option>
-                        <option value="LIDAR">LIDAR</option>
-                        <option value="Lane Line">Lane Line</option>
-                        <option value="Image">Image</option>
-                        <option value="Image segmentation">Image segmentation</option>
-                    </select>
-                </div>
-
-                <!-- 8. Queue Name -->
-                <div class="form-group">
-                    <label for="queueName">Queue Name <span>*</span></label>
-                    <select id="queueName" name="queueName" required>
-                        <option value="" disabled selected>Select Queue...</option>
-                        <option value="alpine_sc3_full_scene_3d_lanes_parallel_labeling">alpine_sc3_full_scene_3d_lanes_parallel_labeling</option>
-                        <option value="mpg_sc3_full_scene_mapless_3d_lanes">mpg_sc3_full_scene_mapless_3d_lanes</option>
-                        <option value="r2s_sc3_3d_labeling">r2s_sc3_3d_labeling</option>
-                        <option value="v4_sc3_full_scene_3d_lanes_parallel_labeling">v4_sc3_full_scene_3d_lanes_parallel_labeling</option>
-                        <option value="sc3_full_scene_lane_lidar_parallel_labeling">sc3_full_scene_lane_lidar_parallel_labeling</option>
-                        <option value="sc3_full_scene_highway_mapless_filtered_3d_lanes">sc3_full_scene_highway_mapless_filtered_3d_lanes</option>
-                    </select>
-                </div>
-
-                <!-- 9. Modality -->
-                <div class="form-group">
-                    <label for="modality">Modality <span>*</span></label>
-                    <select id="modality" name="modality" required>
-                        <option value="" disabled selected>Select Modality...</option>
-                        <option value="LIDAR FP">LIDAR FP</option>
-                        <option value="LIDAR QA">LIDAR QA</option>
-                        <option value="Image FP">Image FP</option>
-                        <option value="Image QA">Image QA</option>
-                        <option value="MSL Map Labeling">MSL Map Labeling</option>
-                        <option value="MSL Map Labeling QA">MSL Map Labeling QA</option>
-                        <option value="Relabeling FP">Relabeling FP</option>
-                        <option value="Relabeling QA">Relabeling QA</option>
-                    </select>
-                </div>
-
-                <!-- 10. Pass -->
-                <div class="form-group">
-                    <label for="passStatus">Pass <span>*</span></label>
-                    <select id="passStatus" name="passStatus" required>
-                        <option value="" disabled selected>Select Status...</option>
-                        <option value="FP">FP</option>
-                        <option value="QA">QA</option>
-                    </select>
-                </div>
-
-                <!-- 11. Issue -->
-                <div class="form-group full-width">
-                    <label for="issue">Issue <span>*</span></label>
-                    <select id="issue" name="issue" required>
-                        <option value="" disabled selected>Select an issue...</option>
-                        <option value="edge case">edge case</option>
-                        <option value="Not a freeway">Not a freeway</option>
-                        <option value="Camera projection issue">Camera projection issue</option>
-                        <option value="Degraded lidar returns">Degraded lidar returns</option>
-                        <option value="Lidar Shift Horizontally">Lidar Shift Horizontally</option>
-                        <option value="Other">Other</option>
-                    </select>
-                </div>
-
-                <!-- 12. Edge Case Sub-Issue & Description -->
-                <div class="form-group full-width hidden-group" id="edgeCaseGroup">
-                    <label for="edgeCaseSubIssue">Edge Case Type <span>*</span></label>
-                    <select id="edgeCaseSubIssue" name="edgeCaseSubIssue">
-                        <option value="" disabled selected>Select edge case type...</option>
-                        <option value="waiting for response">waiting for response</option>
-                        <option value="edge case">edge case</option>
-                        <option value="missed information">missed information</option>
-                        <option value="Tool issue">Tool issue</option>
-                        <option value="Map issue">Map issue</option>
-                        <option value="Other">Other (specify below)</option>
-                    </select>
-                    
-                    <label for="edgeCaseDesc" style="margin-top: 15px;">Edge Case Description <span id="edgeCaseDescRequired" style="display:none;">*</span></label>
-                    <textarea id="edgeCaseDesc" name="edgeCaseDesc" placeholder="Please describe the edge case details here..."></textarea>
-                </div>
-
-                <!-- 13. Other Sub-Selection -->
-                <div class="form-group full-width hidden-group" id="otherSubGroup">
-                    <label for="otherSubIssue">Select Other Type <span>*</span></label>
-                    <select id="otherSubIssue" name="otherSubIssue">
-                        <option value="" disabled selected>Select specific type...</option>
-                        <option value="Lidar points shifting vertically">Lidar Points Shift Vertically</option>
-                        <option value="Other Reason">Other Reason</option>
-                    </select>
-                </div>
-
-                <!-- 14. Other Reason Description -->
-                <div class="form-group full-width hidden-group" id="otherReasonGroup">
-                    <label for="otherReasonDesc">Reason Description <span>*</span></label>
-                    <textarea id="otherReasonDesc" name="otherReasonDesc" placeholder="Please describe the reason here..."></textarea>
-                </div>
-
-                <!-- 15. Issued Frames -->
-                <div class="form-group full-width hidden-group" id="issuedFramesGroup">
-                    <label>Issued Frames <span>*</span></label>
-                    <div class="frames-container">
-                        <div class="form-group">
-                            <label style="font-size:0.9rem; color:#4dabf7;">From Frame</label>
-                            <input type="text" inputmode="numeric" id="frameStart" placeholder="Max 3 digits (1-199)" oninput="validateFrame(this)">
-                        </div>
-                        <div class="form-group">
-                            <label style="font-size:0.9rem; color:#4dabf7;">To Frame</label>
-                            <input type="text" inputmode="numeric" id="frameEnd" placeholder="Max 3 digits (1-199)" oninput="validateFrame(this)">
-                        </div>
-                    </div>
-                </div>
-
-                <div class="full-width">
-                    <button type="submit">Submit Report</button>
-                </div>
-            </div>
-        </form>
-
-        <p id="status"></p>
-    </div>
-
-    <!-- Custom Modal HTML -->
-    <div id="customModal" class="modal-overlay">
-        <div class="modal-content">
-            <h2>Task Submitted ✅</h2>
-            <p style="margin-bottom: 10px; font-size: 0.9rem; color:#aaa;">Please copy the message below to GULP description box:</p>
-            <div id="modalMessage" class="message-box"></div>
-            <div class="modal-buttons">
-                <button class="modal-btn btn-copy" onclick="copyModalMessage()">Copy Message</button>
-                <button class="modal-btn btn-close" onclick="closeModal()">Close</button>
-            </div>
+<div class="container">
+  <h1>Skip Task Tracker</h1>
+  <p class="prayer-text">❤️ ادعوا لأخونا علي ويكا بالرحمة والمغفرة ❤️</p>
+  <form id="taskForm" autocomplete="off">
+    <div class="form-grid">
+      <div class="form-group full-width">
+        <label for="timestamp">Timestamp</label>
+        <input type="text" id="timestamp" name="timestamp" readonly>
+      </div>
+      <div class="form-group">
+        <label for="labelerName">Labeler Name <span>*</span></label>
+        <input type="text" id="labelerName" name="labelerName" placeholder="English letters only" required oninput="this.value = this.value.replace(/[^a-zA-Z\s]/g, '')">
+      </div>
+      <div class="form-group">
+        <label for="userInput">User <span>*</span></label>
+        <input type="text" id="userInput" name="userInput" placeholder="e.g. me123456 or 123456" required maxlength="8" oninput="this.value = this.value.toLowerCase().replace(/[^a-z0-9]/g, '')">
+        <small>Allowed: 123456 OR me123456 (6 digits required)</small>
+      </div>
+      <div class="form-group">
+        <label for="qcName">Reviewed by (QC Name) <span>*</span></label>
+        <input type="text" id="qcName" name="qcName" placeholder="English letters only" required oninput="this.value = this.value.replace(/[^a-zA-Z\s]/g, '')">
+      </div>
+      <div class="form-group">
+        <label for="taskLink">Task Link <span>*</span></label>
+        <input type="url" id="taskLink" name="taskLink" placeholder="Paste labeling link here" required>
+        <small>Must be a valid labeling.robot.car link</small>
+      </div>
+      <div class="form-group">
+        <label for="taskId">Task ID <span>*</span></label>
+        <input type="text" id="taskId" name="taskId" placeholder="Auto-filled ID" required>
+      </div>
+      <div class="form-group">
+        <label for="taskType">Task Type <span>*</span></label>
+        <select id="taskType" name="taskType" required>
+          <option value="" disabled selected>Select Type...</option>
+          <option value="LIDAR">LIDAR</option>
+          <option value="Lane Line">Lane Line</option>
+          <option value="Image">Image</option>
+          <option value="Image segmentation">Image segmentation</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label for="queueName">Queue Name <span>*</span></label>
+        <select id="queueName" name="queueName" required>
+          <option value="" disabled selected>Select Queue...</option>
+          <option value="alpine_sc3_full_scene_3d_lanes_parallel_labeling">alpine_sc3_full_scene_3d_lanes_parallel_labeling</option>
+          <option value="mpg_sc3_full_scene_mapless_3d_lanes">mpg_sc3_full_scene_mapless_3d_lanes</option>
+          <option value="r2s_sc3_3d_labeling">r2s_sc3_3d_labeling</option>
+          <option value="v4_sc3_full_scene_3d_lanes_parallel_labeling">v4_sc3_full_scene_3d_lanes_parallel_labeling</option>
+          <option value="sc3_full_scene_lane_lidar_parallel_labeling">sc3_full_scene_lane_lidar_parallel_labeling</option>
+          <option value="sc3_full_scene_highway_mapless_filtered_3d_lanes">sc3_full_scene_highway_mapless_filtered_3d_lanes</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label for="modality">Modality <span>*</span></label>
+        <select id="modality" name="modality" required>
+          <option value="" disabled selected>Select Modality...</option>
+          <option value="LIDAR FP">LIDAR FP</option>
+          <option value="LIDAR QA">LIDAR QA</option>
+          <option value="Image FP">Image FP</option>
+          <option value="Image QA">Image QA</option>
+          <option value="MSL Map Labeling">MSL Map Labeling</option>
+          <option value="MSL Map Labeling QA">MSL Map Labeling QA</option>
+          <option value="Relabeling FP">Relabeling FP</option>
+          <option value="Relabeling QA">Relabeling QA</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label for="passStatus">Pass <span>*</span></label>
+        <select id="passStatus" name="passStatus" required>
+          <option value="" disabled selected>Select Status...</option>
+          <option value="FP">FP</option>
+          <option value="QA">QA</option>
+        </select>
+      </div>
+      <div class="form-group full-width">
+        <label for="issue">Issue <span>*</span></label>
+        <select id="issue" name="issue" required>
+          <option value="" disabled selected>Select an issue...</option>
+          <option value="edge case">edge case</option>
+          <option value="Not a freeway">Not a freeway</option>
+          <option value="Camera projection issue">Camera projection issue</option>
+          <option value="Degraded lidar returns">Degraded lidar returns</option>
+          <option value="Lidar Shift Horizontally">Lidar Shift Horizontally</option>
+          <option value="Other">Other</option>
+        </select>
+      </div>
+      <div class="form-group full-width hidden-group" id="edgeCaseGroup">
+        <label for="edgeCaseSubIssue">Edge Case Type <span>*</span></label>
+        <select id="edgeCaseSubIssue" name="edgeCaseSubIssue">
+          <option value="" disabled selected>Select edge case type...</option>
+          <option value="waiting for response">waiting for response</option>
+          <option value="edge case">edge case</option>
+          <option value="missed information">missed information</option>
+          <option value="Tool issue">Tool issue</option>
+          <option value="Map issue">Map issue</option>
+          <option value="Other">Other (specify below)</option>
+        </select>
+        <label for="edgeCaseDesc" style="margin-top: 15px;">Edge Case Description <span id="edgeCaseDescRequired" style="display:none;">*</span></label>
+        <textarea id="edgeCaseDesc" name="edgeCaseDesc" placeholder="Please describe the edge case details here..."></textarea>
+      </div>
+      <div class="form-group full-width hidden-group" id="otherSubGroup">
+        <label for="otherSubIssue">Select Other Type <span>*</span></label>
+        <select id="otherSubIssue" name="otherSubIssue">
+          <option value="" disabled selected>Select specific type...</option>
+          <option value="Lidar points shifting vertically">Lidar Points Shift Vertically</option>
+          <option value="Other Reason">Other Reason</option>
+        </select>
+      </div>
+      <div class="form-group full-width hidden-group" id="otherReasonGroup">
+        <label for="otherReasonDesc">Reason Description <span>*</span></label>
+        <textarea id="otherReasonDesc" name="otherReasonDesc" placeholder="Please describe the reason here..."></textarea>
+      </div>
+      <div class="form-group full-width hidden-group" id="issuedFramesGroup">
+        <label>Issued Frames <span>*</span></label>
+        <div class="frames-container">
+          <div class="form-group">
+            <label style="font-size:0.9rem; color:#4dabf7;">From Frame</label>
+            <input type="text" inputmode="numeric" id="frameStart" placeholder="Max 3 digits (1-199)" oninput="validateFrame(this)">
+          </div>
+          <div class="form-group">
+            <label style="font-size:0.9rem; color:#4dabf7;">To Frame</label>
+            <input type="text" inputmode="numeric" id="frameEnd" placeholder="Max 3 digits (1-199)" oninput="validateFrame(this)">
+          </div>
         </div>
+      </div>
+      <div class="full-width">
+        <button type="submit" id="submitBtn">Submit Report</button>
+      </div>
     </div>
+  </form>
+  <p id="status"></p>
+</div>
 
-    <script>
-        const API_URL = "https://script.google.com/macros/s/AKfycbxABnVBg2c7T-h6Yx93pc9IlOW5G6h4jg-NCdH-WXa4DTJ1J-VeOfp88ssYZB4-tA_h4A/exec";
+<div id="customModal" class="modal-overlay">
+  <div class="modal-content">
+    <h2>Task Submitted ✅</h2>
+    <p style="margin-bottom: 10px; font-size: 0.9rem; color:#aaa;">Please copy the message below to GULP description box:</p>
+    <div id="modalMessage" class="message-box"></div>
+    <div class="modal-buttons">
+      <button class="modal-btn btn-copy" onclick="copyModalMessage()">Copy Message</button>
+      <button class="modal-btn btn-close" onclick="closeModal()">Close</button>
+    </div>
+  </div>
+</div>
 
-        const form = document.getElementById('taskForm');
-        const issueSelect = document.getElementById('issue');
-        
-        // Groups
-        const issuedFramesGroup = document.getElementById('issuedFramesGroup');
-        const edgeCaseGroup = document.getElementById('edgeCaseGroup');
-        const otherSubGroup = document.getElementById('otherSubGroup');
-        const otherReasonGroup = document.getElementById('otherReasonGroup');
-        
-        // Inputs
-        const frameStartInput = document.getElementById('frameStart');
-        const frameEndInput = document.getElementById('frameEnd');
-        const edgeCaseDescInput = document.getElementById('edgeCaseDesc');
-        const edgeCaseSubIssueSelect = document.getElementById('edgeCaseSubIssue');
-        const edgeCaseDescRequired = document.getElementById('edgeCaseDescRequired');
-        const otherSubIssueSelect = document.getElementById('otherSubIssue');
-        const otherReasonDescInput = document.getElementById('otherReasonDesc');
-        
-        const timestampInput = document.getElementById('timestamp');
-        const statusPara = document.getElementById('status');
-        const taskLinkInput = document.getElementById('taskLink');
-        const taskIdInput = document.getElementById('taskId');
-        const userInput = document.getElementById('userInput');
-        const labelerNameInput = document.getElementById('labelerName');
-        const qcNameInput = document.getElementById('qcName');
+<script>
+/* =====================================================
+   ✅ رابط الـ API — وضع مزدوج (Dual Mode):
+   - لو الصفحة معمولة Serve من Apps Script (?action=form) → الرابط بيتملي أوتوماتيك
+   - لو الصفحة مستضافة خارجياً → حط رابط الـ /exec في MANUAL_URL
+===================================================== */
+const INJECTED_URL = "<?= apiUrl ?>";
+const MANUAL_URL = "https://script.google.com/macros/s/AKfycbxABnVBg2c7T-h6Yx93pc9IlOW5G6h4jg-NCdH-WXa4DTJ1J-VeOfp88ssYZB4-tA_h4A/exec";
+const API_URL = (INJECTED_URL && INJECTED_URL.indexOf("<?=") === -1) ? INJECTED_URL : MANUAL_URL;
 
-        // Modal Elements
-        const customModal = document.getElementById('customModal');
-        const modalMessage = document.getElementById('modalMessage');
+const form = document.getElementById('taskForm');
+const issueSelect = document.getElementById('issue');
+const issuedFramesGroup = document.getElementById('issuedFramesGroup');
+const edgeCaseGroup = document.getElementById('edgeCaseGroup');
+const otherSubGroup = document.getElementById('otherSubGroup');
+const otherReasonGroup = document.getElementById('otherReasonGroup');
+const frameStartInput = document.getElementById('frameStart');
+const frameEndInput = document.getElementById('frameEnd');
+const edgeCaseDescInput = document.getElementById('edgeCaseDesc');
+const edgeCaseSubIssueSelect = document.getElementById('edgeCaseSubIssue');
+const edgeCaseDescRequired = document.getElementById('edgeCaseDescRequired');
+const otherSubIssueSelect = document.getElementById('otherSubIssue');
+const otherReasonDescInput = document.getElementById('otherReasonDesc');
+const timestampInput = document.getElementById('timestamp');
+const statusPara = document.getElementById('status');
+const taskLinkInput = document.getElementById('taskLink');
+const taskIdInput = document.getElementById('taskId');
+const userInput = document.getElementById('userInput');
+const labelerNameInput = document.getElementById('labelerName');
+const qcNameInput = document.getElementById('qcName');
+const submitBtn = document.getElementById('submitBtn');
+const customModal = document.getElementById('customModal');
+const modalMessage = document.getElementById('modalMessage');
 
-        // 1. Timestamp
-        function setTimestamp() {
-            const now = new Date();
-            const options = {
-                timeZone: "Africa/Cairo",
-                year: 'numeric', month: '2-digit', day: '2-digit',
-                hour: '2-digit', minute: '2-digit', second: '2-digit',
-                hour12: true
-            };
-            timestampInput.value = now.toLocaleString('en-US', options).replace(',', '');
-        }
-        setTimestamp();
-        setInterval(setTimestamp, 1000);
+/* ---------- Timestamp ---------- */
+function setTimestamp() {
+  const now = new Date();
+  const options = {
+    timeZone: "Africa/Cairo",
+    year: 'numeric', month: '2-digit', day: '2-digit',
+    hour: '2-digit', minute: '2-digit', second: '2-digit',
+    hour12: true
+  };
+  timestampInput.value = now.toLocaleString('en-US', options).replace(',', '');
+}
+setTimestamp();
+setInterval(setTimestamp, 1000);
 
-        // Helper: Hide All Dynamic Groups
-        function hideAllDynamicGroups() {
-            issuedFramesGroup.classList.remove('visible');
-            edgeCaseGroup.classList.remove('visible');
-            otherSubGroup.classList.remove('visible');
-            otherReasonGroup.classList.remove('visible');
+/* ---------- Dynamic Groups ---------- */
+function hideAllDynamicGroups() {
+  issuedFramesGroup.classList.remove('visible');
+  edgeCaseGroup.classList.remove('visible');
+  otherSubGroup.classList.remove('visible');
+  otherReasonGroup.classList.remove('visible');
+  frameStartInput.removeAttribute('required');
+  frameEndInput.removeAttribute('required');
+  edgeCaseDescInput.removeAttribute('required');
+  otherReasonDescInput.removeAttribute('required');
+  edgeCaseSubIssueSelect.removeAttribute('required');
+  edgeCaseDescRequired.style.display = 'none';
+}
 
-            frameStartInput.removeAttribute('required');
-            frameEndInput.removeAttribute('required');
-            edgeCaseDescInput.removeAttribute('required');
-            otherReasonDescInput.removeAttribute('required');
-            edgeCaseSubIssueSelect.removeAttribute('required');
-            edgeCaseDescRequired.style.display = 'none';
-        }
+issueSelect.addEventListener('change', function () {
+  hideAllDynamicGroups();
+  const value = this.value;
+  if (value === 'Lidar Shift Horizontally') {
+    issuedFramesGroup.classList.add('visible');
+    frameStartInput.setAttribute('required', 'required');
+    frameEndInput.setAttribute('required', 'required');
+  } else if (value === 'edge case') {
+    edgeCaseGroup.classList.add('visible');
+    edgeCaseSubIssueSelect.setAttribute('required', 'required');
+  } else if (value === 'Other') {
+    otherSubGroup.classList.add('visible');
+  }
+});
 
-        // 2. Main Issue Change Logic
-        issueSelect.addEventListener('change', function() {
-            hideAllDynamicGroups();
-            const value = this.value;
+edgeCaseSubIssueSelect.addEventListener('change', function () {
+  if (this.value === 'Other') {
+    edgeCaseDescInput.setAttribute('required', 'required');
+    edgeCaseDescRequired.style.display = 'inline';
+  } else {
+    edgeCaseDescInput.removeAttribute('required');
+    edgeCaseDescRequired.style.display = 'none';
+  }
+});
 
-            if (value === 'Lidar Shift Horizontally') {
-                issuedFramesGroup.classList.add('visible');
-                frameStartInput.setAttribute('required', 'required');
-                frameEndInput.setAttribute('required', 'required');
-            } else if (value === 'edge case') {
-                edgeCaseGroup.classList.add('visible');
-                edgeCaseSubIssueSelect.setAttribute('required', 'required');
-            } else if (value === 'Other') {
-                otherSubGroup.classList.add('visible');
-            }
-        });
+otherSubIssueSelect.addEventListener('change', function () {
+  issuedFramesGroup.classList.remove('visible');
+  otherReasonGroup.classList.remove('visible');
+  frameStartInput.removeAttribute('required');
+  frameEndInput.removeAttribute('required');
+  otherReasonDescInput.removeAttribute('required');
+  const subValue = this.value;
+  if (subValue === 'Lidar points shifting vertically') {
+    issuedFramesGroup.classList.add('visible');
+    frameStartInput.setAttribute('required', 'required');
+    frameEndInput.setAttribute('required', 'required');
+  } else if (subValue === 'Other Reason') {
+    otherReasonGroup.classList.add('visible');
+    otherReasonDescInput.setAttribute('required', 'required');
+  }
+});
 
-        // Edge Case Sub-Issue Change Logic
-        edgeCaseSubIssueSelect.addEventListener('change', function() {
-            if (this.value === 'Other') {
-                edgeCaseDescInput.setAttribute('required', 'required');
-                edgeCaseDescRequired.style.display = 'inline';
-            } else {
-                edgeCaseDescInput.removeAttribute('required');
-                edgeCaseDescRequired.style.display = 'none';
-            }
-        });
+function validateFrame(input) {
+  input.value = input.value.replace(/\D/g, '');
+  if (input.value.length > 3) input.value = input.value.slice(0, 3);
+}
 
-        // 3. Other Sub-Selection Change Logic
-        otherSubIssueSelect.addEventListener('change', function() {
-            issuedFramesGroup.classList.remove('visible');
-            otherReasonGroup.classList.remove('visible');
-            frameStartInput.removeAttribute('required');
-            frameEndInput.removeAttribute('required');
-            otherReasonDescInput.removeAttribute('required');
+/* ---------- Auto-fill Task ID ---------- */
+taskLinkInput.addEventListener('input', function () {
+  const match = this.value.match(/\/id\/(\d+)/);
+  if (match && match[1]) taskIdInput.value = match[1];
+});
 
-            const subValue = this.value;
+/* ---------- Helpers ---------- */
+function formatNameCase(str) {
+  if (!str) return "";
+  str = str.toLowerCase();
+  return str.replace(/\b\w/g, char => char.toUpperCase());
+}
 
-            if (subValue === 'Lidar points shifting vertically') {
-                issuedFramesGroup.classList.add('visible');
-                frameStartInput.setAttribute('required', 'required');
-                frameEndInput.setAttribute('required', 'required');
-            } else if (subValue === 'Other Reason') {
-                otherReasonGroup.classList.add('visible');
-                otherReasonDescInput.setAttribute('required', 'required');
-            }
-        });
+function formatUser(rawUser) {
+  if (!rawUser) return { valid: false, value: "" };
+  if (rawUser.startsWith("me")) {
+    const digits = rawUser.substring(2);
+    if (/^\d{6}$/.test(digits)) return { valid: true, value: "me" + digits + "@meti.ai" };
+  } else if (/^\d{6}$/.test(rawUser)) {
+    return { valid: true, value: "me" + rawUser + "@meti.ai" };
+  }
+  return { valid: false, value: "" };
+}
 
-        // 4. Frame Validation (Live)
-        function validateFrame(input) {
-            input.value = input.value.replace(/\D/g, '');
-            if (input.value.length > 3) {
-                input.value = input.value.slice(0, 3);
-            }
-        }
+function cleanTaskLink(url) {
+  try {
+    url = url.trim();
+    const idMatch = url.match(/\/id\/(\d+)/);
+    if (!idMatch) return url;
+    const id = idMatch[1];
+    const projectMatch = url.match(/\/do\/([^/]+)\/id\//);
+    let finalProject = "SellIvandarQA";
+    if (projectMatch && projectMatch[1]) finalProject = projectMatch[1];
+    return "https://labeling.robot.car/#/tasks/do/" + finalProject + "/id/" + id;
+  } catch (e) { return url; }
+}
 
-        // 5. Auto-fill Task ID
-        taskLinkInput.addEventListener('input', function() {
-            const url = this.value;
-            const match = url.match(/\/id\/(\d+)/);
-            if (match && match[1]) {
-                taskIdInput.value = match[1];
-            }
-        });
+function containsUrl(text) {
+  return /(http|https|www\.)/i.test(text);
+}
 
-        // 6. Helper: Format Name
-        function formatNameCase(str) {
-            if (!str) return "";
-            str = str.toLowerCase();
-            return str.replace(/\b\w/g, char => char.toUpperCase());
-        }
+function setStatus(msg, type) {
+  statusPara.textContent = msg;
+  statusPara.className = type || '';
+}
 
-        // 7. Helper: Format User
-        function formatUser(rawUser) {
-            if (!rawUser) return { valid: false, value: "" };
-            
-            if (rawUser.startsWith("me")) {
-                const digits = rawUser.substring(2);
-                if (/^\d{6}$/.test(digits)) {
-                    return { valid: true, value: `me${digits}@meti.ai` };
-                }
-            }
-            else if (/^\d{6}$/.test(rawUser)) {
-                 return { valid: true, value: `me${rawUser}@meti.ai` };
-            }
-            
-            return { valid: false, value: "" };
-        }
+/* ---------- Modal ---------- */
+function showModal(message) {
+  modalMessage.innerText = message;
+  customModal.style.display = 'flex';
+}
+function closeModal() { customModal.style.display = 'none'; }
+function copyModalMessage() {
+  const text = modalMessage.innerText;
+  navigator.clipboard.writeText(text).then(() => {
+    const btn = document.querySelector('.btn-copy');
+    const originalText = btn.innerText;
+    btn.innerText = "Copied!";
+    btn.style.background = "#4dabf7";
+    setTimeout(() => { btn.innerText = originalText; btn.style.background = "#69db7c"; }, 1500);
+  }).catch(() => { alert("Failed to copy text."); });
+}
 
-        // 8. Clean Link
-        function cleanTaskLink(url) {
-            try {
-                url = url.trim();
-                const idMatch = url.match(/\/id\/(\d+)/);
-                if (!idMatch) return url;
-                const id = idMatch[1];
+function getGulpMessage() {
+  const issueVal = issueSelect.value;
+  const start = frameStartInput.value;
+  const end = frameEndInput.value;
+  if (issueVal === "Degraded lidar returns") return "The lidar that is having the issue";
+  if (issueVal === "Lidar Shift Horizontally") return "Lidar Shift Horizontally from " + start + " to " + end;
+  if (issueVal === "edge case") return "edge case";
+  if (issueVal === "Other" && otherSubIssueSelect.value === "Lidar points shifting vertically") {
+    return "Lidar Shift Vertically from " + start + " to " + end;
+  }
+  return "Task Submitted Successfully";
+}
 
-                const projectMatch = url.match(/\/do\/([^/]+)\/id\//);
-                let finalProject = "SellIvandarQA";
+/* =====================================================
+   ✅ الـ Fetch الآمن — ده اللي بيقتل رسالة
+   "Unexpected token '<'" نهائياً
+===================================================== */
+async function postJSON(payload) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 45000);
+  let res;
+  try {
+    res = await fetch(API_URL, {
+      method: "POST",
+      headers: { "Content-Type": "text/plain;charset=utf-8" },
+      body: JSON.stringify(payload),
+      signal: controller.signal,
+      cache: "no-store"
+    });
+  } catch (netErr) {
+    clearTimeout(timer);
+    if (netErr && netErr.name === 'AbortError') {
+      throw new Error('Server took too long to respond. Please try again.');
+    }
+    throw new Error('Cannot connect to the server. Check your internet connection.');
+  }
+  clearTimeout(timer);
 
-                if (projectMatch && projectMatch[1]) {
-                    finalProject = projectMatch[1];
-                }
+  // ✅ قراءة النص أولاً ثم محاولة parse بأمان (مفيش res.json() أعمى تاني)
+  const text = await res.text();
+  let data = null;
+  try { data = JSON.parse(text); } catch (e) { data = null; }
 
-                return `https://labeling.robot.car/#/tasks/do/${finalProject}/id/${id}`;
+  if (!data || typeof data !== 'object') {
+    // لو وصلت صفحة HTML → نسجلها للأدمن في الـ console ونعرض رسالة واضحة
+    console.error('Non-JSON response received:', text.slice(0, 400));
+    throw new Error('Server returned a page instead of data. Admin: deploy Web App with "Who has access: Anyone" and make sure API_URL is the /exec link.');
+  }
+  return data;
+}
 
-            } catch (e) {
-                return url;
-            }
-        }
+/* ---------- Submit ---------- */
+form.addEventListener('submit', async function (e) {
+  e.preventDefault();
 
-        // 9. Helper: Check for URL
-        function containsUrl(text) {
-            const urlPattern = /(http|https|www\.)/i;
-            return urlPattern.test(text);
-        }
+  // 1. Labeler Name
+  const labelerVal = labelerNameInput.value.trim();
+  if (labelerVal.length < 3 || /[^a-zA-Z\s]/.test(labelerVal)) { setStatus('Error: Labeler Name must be at least 3 English letters.', 'error'); return; }
+  if (containsUrl(labelerVal)) { setStatus('Error: Links are not allowed in Labeler Name.', 'error'); return; }
 
-        // --- Modal Functions ---
-        function showModal(message) {
-            modalMessage.innerText = message;
-            customModal.style.display = 'flex';
-        }
+  // 2. QC Name
+  const qcVal = qcNameInput.value.trim();
+  if (qcVal.length < 3 || /[^a-zA-Z\s]/.test(qcVal)) { setStatus('Error: QC Name must be at least 3 English letters.', 'error'); return; }
+  if (containsUrl(qcVal)) { setStatus('Error: Links are not allowed in QC Name.', 'error'); return; }
 
-        function closeModal() {
-            customModal.style.display = 'none';
-        }
+  // 3. User
+  const userResult = formatUser(userInput.value);
+  if (!userResult.valid) { setStatus('Error: User must be 6 digits or me+6 digits.', 'error'); return; }
 
-        function copyModalMessage() {
-            const text = modalMessage.innerText;
-            navigator.clipboard.writeText(text).then(() => {
-                const btn = document.querySelector('.btn-copy');
-                const originalText = btn.innerText;
-                btn.innerText = "Copied!";
-                btn.style.background = "#4dabf7";
-                setTimeout(() => {
-                    btn.innerText = originalText;
-                    btn.style.background = "#69db7c";
-                }, 1500);
-            }).catch(err => {
-                alert("Failed to copy text.");
-            });
-        }
+  // 4. Task Link
+  const taskLinkVal = taskLinkInput.value.trim();
+  if (!taskLinkVal.startsWith("https://labeling.robot.car/#/tasks/do/")) { setStatus('Error: Invalid Task Link. Please use the correct labeling link.', 'error'); return; }
 
-        // Helper: Get GULP Message based on Logic
-        function getGulpMessage() {
-            const issueVal = issueSelect.value;
-            const start = frameStartInput.value;
-            const end = frameEndInput.value;
+  // 5. Frames
+  if (issuedFramesGroup.classList.contains('visible')) {
+    const start = parseInt(frameStartInput.value);
+    const end = parseInt(frameEndInput.value);
+    if (isNaN(start) || isNaN(end)) { setStatus('Error: Frames must be numbers.', 'error'); return; }
+    if (start < 1 || start > 199 || end < 1 || end > 199) { setStatus('Error: Frame range must be between 1 and 199.', 'error'); return; }
+  }
 
-            if (issueVal === "Degraded lidar returns") {
-                return "The lidar that is having the issue";
-            } 
-            else if (issueVal === "Lidar Shift Horizontally") {
-                return `Lidar Shift Horizontally from ${start} to ${end}`;
-            } 
-            else if (issueVal === "edge case") {
-                return "edge case";
-            } 
-            else if (issueVal === "Other") {
-                const subVal = otherSubIssueSelect.value;
-                if (subVal === "Lidar points shifting vertically") {
-                    return `Lidar Shift Vertically from ${start} to ${end}`;
-                }
-            }
-            
-            return "Task Submitted Successfully";
-        }
+  // 6. Edge Case
+  if (edgeCaseGroup.classList.contains('visible')) {
+    if (!edgeCaseSubIssueSelect.value) { setStatus('Error: Please select an edge case type.', 'error'); return; }
+    if (edgeCaseSubIssueSelect.value === 'Other') {
+      const edgeVal = edgeCaseDescInput.value.trim();
+      if (!edgeVal) { setStatus('Error: Please describe the edge case.', 'error'); return; }
+      if (containsUrl(edgeVal)) { setStatus('Error: Links are not allowed in Description.', 'error'); return; }
+    }
+  }
 
-        // 10. Submit
-        form.addEventListener('submit', async function(e) {
-            e.preventDefault();
+  // 7. Other Reason
+  if (otherReasonGroup.classList.contains('visible')) {
+    const reasonVal = otherReasonDescInput.value.trim();
+    if (!reasonVal) { setStatus('Error: Please describe the reason.', 'error'); return; }
+    if (containsUrl(reasonVal)) { setStatus('Error: Links are not allowed in Description.', 'error'); return; }
+  }
 
-            // --- Validations ---
-            // 1. Labeler Name
-            const labelerVal = labelerNameInput.value.trim();
-            if (labelerVal.length < 3 || /[^a-zA-Z\s]/.test(labelerVal)) {
-                statusPara.className = 'error';
-                statusPara.textContent = 'Error: Labeler Name must be at least 3 English letters.';
-                return;
-            }
-            if (containsUrl(labelerVal)) {
-                statusPara.className = 'error';
-                statusPara.textContent = 'Error: Links are not allowed in Labeler Name.';
-                return;
-            }
+  // 8. Other sub-selection
+  if (issueSelect.value === 'Other' && !otherSubIssueSelect.value) { setStatus('Error: Please select a specific type for Other.', 'error'); return; }
 
-            // 2. QC Name
-            const qcVal = qcNameInput.value.trim();
-            if (qcVal.length < 3 || /[^a-zA-Z\s]/.test(qcVal)) {
-                statusPara.className = 'error';
-                statusPara.textContent = 'Error: QC Name must be at least 3 English letters.';
-                return;
-            }
-            if (containsUrl(qcVal)) {
-                statusPara.className = 'error';
-                statusPara.textContent = 'Error: Links are not allowed in QC Name.';
-                return;
-            }
+  // ---------- Data Preparation ----------
+  const formData = new FormData(form);
+  const finalLabelerName = formatNameCase(labelerVal);
+  const finalQcName = formatNameCase(qcVal);
+  const finalUser = userResult.value;
+  const finalLink = cleanTaskLink(taskLinkVal);
 
-            // 3. User
-            const userResult = formatUser(userInput.value);
-            if (!userResult.valid) {
-                statusPara.className = 'error';
-                statusPara.textContent = 'Error: User must be 6 digits or me+6 digits.';
-                return;
-            }
+  let finalIssue = formData.get('issue');
+  if (finalIssue === 'edge case') {
+    const subIssue = edgeCaseSubIssueSelect.value;
+    finalIssue = (subIssue === 'Other')
+      ? 'edge case: ' + edgeCaseDescInput.value.trim()
+      : 'edge case: ' + subIssue;
+  } else if (finalIssue === 'Other') {
+    const subIssue = otherSubIssueSelect.value;
+    finalIssue = (subIssue === 'Lidar points shifting vertically')
+      ? "Other: Lidar Points Shift Vertically"
+      : 'Other: ' + otherReasonDescInput.value.trim();
+  }
 
-            // 4. Task Link
-            const taskLinkVal = taskLinkInput.value.trim();
-            if (!taskLinkVal.startsWith("https://labeling.robot.car/#/tasks/do/")) {
-                statusPara.className = 'error';
-                statusPara.textContent = 'Error: Invalid Task Link. Please use the correct labeling link.';
-                return;
-            }
+  let finalFrames = "";
+  if (issuedFramesGroup.classList.contains('visible')) {
+    finalFrames = "from frame " + frameStartInput.value + " to frame " + frameEndInput.value;
+  }
 
-            // 5. Frames Validation
-            if (issuedFramesGroup.classList.contains('visible')) {
-                const start = parseInt(frameStartInput.value);
-                const end = parseInt(frameEndInput.value);
+  const data = {
+    timestamp: formData.get('timestamp'),
+    labelerName: finalLabelerName,
+    user: finalUser,
+    qcName: finalQcName,
+    taskLink: finalLink,
+    taskId: formData.get('taskId'),
+    taskType: formData.get('taskType'),
+    queueName: formData.get('queueName'),
+    modality: formData.get('modality'),
+    passStatus: formData.get('passStatus'),
+    issue: finalIssue,
+    issuedFrames: finalFrames,
+    edgeCaseDesc: edgeCaseDescInput.value.trim() || ""
+  };
 
-                if (isNaN(start) || isNaN(end)) {
-                    statusPara.className = 'error';
-                    statusPara.textContent = 'Error: Frames must be numbers.';
-                    return;
-                }
-                if (start < 1 || start > 199 || end < 1 || end > 199) {
-                    statusPara.className = 'error';
-                    statusPara.textContent = 'Error: Frame range must be between 1 and 199.';
-                    return;
-                }
-            }
+  // ✅ قفل الزرار لمنع الدبل سبمت
+  submitBtn.disabled = true;
+  setStatus('Submitting...', '');
 
-            // 6. Edge Case Validation
-            if (edgeCaseGroup.classList.contains('visible')) {
-                if (!edgeCaseSubIssueSelect.value) {
-                    statusPara.className = 'error';
-                    statusPara.textContent = 'Error: Please select an edge case type.';
-                    return;
-                }
-                if (edgeCaseSubIssueSelect.value === 'Other') {
-                    const edgeVal = edgeCaseDescInput.value.trim();
-                    if (!edgeVal) {
-                        statusPara.className = 'error';
-                        statusPara.textContent = 'Error: Please describe the edge case.';
-                        return;
-                    }
-                    if (containsUrl(edgeVal)) {
-                        statusPara.className = 'error';
-                        statusPara.textContent = 'Error: Links are not allowed in Description.';
-                        return;
-                    }
-                }
-            }
-
-            // 7. Other Reason Validation
-            if (otherReasonGroup.classList.contains('visible')) {
-                const reasonVal = otherReasonDescInput.value.trim();
-                if (!reasonVal) {
-                    statusPara.className = 'error';
-                    statusPara.textContent = 'Error: Please describe the reason.';
-                    return;
-                }
-                if (containsUrl(reasonVal)) {
-                    statusPara.className = 'error';
-                    statusPara.textContent = 'Error: Links are not allowed in Description.';
-                    return;
-                }
-            }
-            
-            // 8. Ensure sub-selection is made if "Other" is chosen
-            if (issueSelect.value === 'Other' && !otherSubIssueSelect.value) {
-                statusPara.className = 'error';
-                statusPara.textContent = 'Error: Please select a specific type for Other.';
-                return;
-            }
-
-            // Data Preparation
-            const formData = new FormData(form);
-            
-            const finalLabelerName = formatNameCase(labelerVal);
-            const finalQcName = formatNameCase(qcVal);
-            const finalUser = userResult.value;
-            const finalLink = cleanTaskLink(taskLinkVal);
-
-            // Handle Issue Text Construction
-            let finalIssue = formData.get('issue');
-            
-            if (finalIssue === 'edge case') {
-                const subIssue = edgeCaseSubIssueSelect.value;
-                const desc = edgeCaseDescInput.value.trim();
-                if (subIssue === 'Other') {
-                    finalIssue = `edge case: ${desc}`;
-                } else {
-                    finalIssue = `edge case: ${subIssue}`;
-                }
-            } else if (finalIssue === 'Other') {
-                const subIssue = otherSubIssueSelect.value;
-                if (subIssue === 'Lidar points shifting vertically') {
-                    finalIssue = "Other: Lidar Points Shift Vertically";
-                } else if (subIssue === 'Other Reason') {
-                    finalIssue = `Other: ${otherReasonDescInput.value.trim()}`;
-                }
-            }
-
-            let finalFrames = "";
-            if (issuedFramesGroup.classList.contains('visible')) {
-                finalFrames = `from frame ${frameStartInput.value} to frame ${frameEndInput.value}`;
-            }
-
-            // ==================== التعديل هنا ====================
-            // بنضيف الحقل الجديد edgeCaseDesc في الـ Data Payload
-            // ====================================================
-            const data = {
-                timestamp: formData.get('timestamp'),
-                labelerName: finalLabelerName,
-                user: finalUser,
-                qcName: finalQcName,
-                taskLink: finalLink,
-                taskId: formData.get('taskId'),
-                taskType: formData.get('taskType'),
-                queueName: formData.get('queueName'),
-                modality: formData.get('modality'),
-                passStatus: formData.get('passStatus'),
-                issue: finalIssue,
-                issuedFrames: finalFrames,
-                edgeCaseDesc: edgeCaseDescInput.value.trim() || ""  // <-- الحقل الجديد
-            };
-
-            statusPara.className = '';
-            statusPara.textContent = 'Submitting...';
-
-            try {
-                const res = await fetch(API_URL, {
-                    method: "POST",
-                    headers: { "Content-Type": "text/plain;charset=utf-8" }, 
-                    body: JSON.stringify(data)
-                });
-                const json = await res.json();
-                if (!json.ok) throw new Error(json.error);
-
-                // --- Success Actions ---
-                
-                // 1. Prepare the specific message for the modal
-                const messageToShow = getGulpMessage();
-
-                // 2. Show the modal instead of simple status text
-                showModal(messageToShow);
-
-                // 3. Reset form
-                form.reset(); 
-                setTimestamp();
-                hideAllDynamicGroups();
-                statusPara.textContent = '';
-
-            } catch (err) {
-                statusPara.className = 'error';
-                statusPara.textContent = 'Failed ❌: ' + err.message;
-            }
-        });
-    </script>
+  try {
+    const result = await postJSON(data);
+    if (!result.ok) throw new Error(result.error || 'Server rejected the data.');
+    showModal(getGulpMessage());
+    form.reset();
+    setTimestamp();
+    hideAllDynamicGroups();
+    setStatus('', '');
+  } catch (err) {
+    setStatus('Failed ❌: ' + (err.message || 'Unexpected error.'), 'error');
+  } finally {
+    submitBtn.disabled = false;
+  }
+});
+</script>
 </body>
 </html>
