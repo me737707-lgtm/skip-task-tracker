@@ -264,9 +264,14 @@ label span { color: #ff6b6b; }
    ✅ رابط الـ API — وضع مزدوج (Dual Mode):
    - لو الصفحة معمولة Serve من Apps Script (?action=form) → الرابط بيتملي أوتوماتيك
    - لو الصفحة مستضافة خارجياً → حط رابط الـ /exec في MANUAL_URL
+
+   ⚠️ مهم جداً بعد أي Deploy جديد:
+   لازم تستبدل القيمة تحت بآخر رابط /exec ظاهر في
+   Deploy > Manage deployments بعد عمل "New version".
+   رابط الاختبار السريع: MANUAL_URL + "?action=ping"
 ===================================================== */
 const INJECTED_URL = "<?= apiUrl ?>";
-const MANUAL_URL = "https://script.google.com/macros/s/AKfycbxABnVBg2c7T-h6Yx93pc9IlOW5G6h4jg-NCdH-WXa4DTJ1J-VeOfp88ssYZB4-tA_h4A/exec";
+const MANUAL_URL = "https://script.google.com/macros/s/AKfycbzkGC2SBVWjr8DtffZ_bNDcHB7iqTN_CNUeZy2Zn0AupwP1SBgcgKZ-8HKymvAuqeRw5Q/exec";
 const API_URL = (INJECTED_URL && INJECTED_URL.indexOf("<?=") === -1) ? INJECTED_URL : MANUAL_URL;
 
 const form = document.getElementById('taskForm');
@@ -445,8 +450,8 @@ function getGulpMessage() {
 }
 
 /* =====================================================
-   ✅ الـ Fetch الآمن — ده اللي بيقتل رسالة
-   "Unexpected token '<'" نهائياً
+   ✅ الـ Fetch الآمن — وفيه دلوقتي تشخيص أدق للسبب
+   بدل رسالة "Unexpected token '<'" العمياء
 ===================================================== */
 async function postJSON(payload) {
   const controller = new AbortController();
@@ -475,9 +480,20 @@ async function postJSON(payload) {
   try { data = JSON.parse(text); } catch (e) { data = null; }
 
   if (!data || typeof data !== 'object') {
-    // لو وصلت صفحة HTML → نسجلها للأدمن في الـ console ونعرض رسالة واضحة
-    console.error('Non-JSON response received:', text.slice(0, 400));
-    throw new Error('Server returned a page instead of data. Admin: deploy Web App with "Who has access: Anyone" and make sure API_URL is the /exec link.');
+    console.error('Non-JSON response received. Status:', res.status, 'Body:', text.slice(0, 400));
+    const lower = text.toLowerCase();
+
+    // تشخيص دقيق للسبب بدل رسالة عامة
+    if (lower.indexOf('accounts.google.com') !== -1 || lower.indexOf('servicelogin') !== -1 || lower.indexOf('signin') !== -1) {
+      throw new Error('This form is not public yet. Admin: redeploy the Web App with "Who has access: Anyone" (not "Anyone with Google account").');
+    }
+    if (res.status === 404) {
+      throw new Error('The deployment link is invalid or was deleted (404). Admin: get a fresh /exec link from Deploy > Manage deployments.');
+    }
+    if (res.status >= 500) {
+      throw new Error('The script crashed before responding (Error ' + res.status + '). Admin: check Apps Script > Executions log.');
+    }
+    throw new Error('Server returned a page instead of data. Admin: verify the deployment is "New version" + "Execute as: Me" + "Who has access: Anyone", and that API_URL is the latest /exec link.');
   }
   return data;
 }
