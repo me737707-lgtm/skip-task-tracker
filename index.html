@@ -188,6 +188,15 @@ label span { color: #ff6b6b; }
           <option value="QA">QA</option>
         </select>
       </div>
+      <div class="form-group">
+        <label for="shift">Shift <span>*</span></label>
+        <select id="shift" name="shift" required>
+          <option value="" disabled selected>Select Shift...</option>
+          <option value="Morning">Morning</option>
+          <option value="Night">Night</option>
+          <option value="Overnight">Overnight</option>
+        </select>
+      </div>
       <div class="form-group full-width">
         <label for="issue">Issue <span>*</span></label>
         <select id="issue" name="issue" required>
@@ -294,6 +303,7 @@ const taskIdInput = document.getElementById('taskId');
 const userInput = document.getElementById('userInput');
 const labelerNameInput = document.getElementById('labelerName');
 const qcNameInput = document.getElementById('qcName');
+const shiftSelect = document.getElementById('shift');
 const submitBtn = document.getElementById('submitBtn');
 const customModal = document.getElementById('customModal');
 const modalMessage = document.getElementById('modalMessage');
@@ -520,7 +530,10 @@ form.addEventListener('submit', async function (e) {
   const taskLinkVal = taskLinkInput.value.trim();
   if (!taskLinkVal.startsWith("https://labeling.robot.car/#/tasks/do/")) { setStatus('Error: Invalid Task Link. Please use the correct labeling link.', 'error'); return; }
 
-  // 5. Frames
+  // 5. Shift
+  if (!shiftSelect.value) { setStatus('Error: Please select a Shift.', 'error'); return; }
+
+  // 6. Frames
   if (issuedFramesGroup.classList.contains('visible')) {
     const start = parseInt(frameStartInput.value);
     const end = parseInt(frameEndInput.value);
@@ -528,7 +541,7 @@ form.addEventListener('submit', async function (e) {
     if (start < 1 || start > 199 || end < 1 || end > 199) { setStatus('Error: Frame range must be between 1 and 199.', 'error'); return; }
   }
 
-  // 6. Edge Case
+  // 7. Edge Case
   if (edgeCaseGroup.classList.contains('visible')) {
     if (!edgeCaseSubIssueSelect.value) { setStatus('Error: Please select an edge case type.', 'error'); return; }
     if (edgeCaseSubIssueSelect.value === 'Other') {
@@ -538,14 +551,14 @@ form.addEventListener('submit', async function (e) {
     }
   }
 
-  // 7. Other Reason
+  // 8. Other Reason
   if (otherReasonGroup.classList.contains('visible')) {
     const reasonVal = otherReasonDescInput.value.trim();
     if (!reasonVal) { setStatus('Error: Please describe the reason.', 'error'); return; }
     if (containsUrl(reasonVal)) { setStatus('Error: Links are not allowed in Description.', 'error'); return; }
   }
 
-  // 8. Other sub-selection
+  // 9. Other sub-selection
   if (issueSelect.value === 'Other' && !otherSubIssueSelect.value) { setStatus('Error: Please select a specific type for Other.', 'error'); return; }
 
   // ---------- Data Preparation ----------
@@ -586,7 +599,8 @@ form.addEventListener('submit', async function (e) {
     passStatus: formData.get('passStatus'),
     issue: finalIssue,
     issuedFrames: finalFrames,
-    edgeCaseDesc: edgeCaseDescInput.value.trim() || ""
+    edgeCaseDesc: edgeCaseDescInput.value.trim() || "",
+    shift: formData.get('shift')
   };
 
   // ✅ قفل الزرار لمنع الدبل سبمت
