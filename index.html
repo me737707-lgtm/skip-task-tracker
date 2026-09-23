@@ -73,6 +73,7 @@ button:disabled { background: #3a7ca8; cursor: not-allowed; opacity: 0.7; }
 #status { text-align: center; margin-top: 20px; font-weight: 600; font-size: 1.1rem; min-height: 24px; }
 .success { color: #69db7c; }
 .error { color: #ff6b6b; }
+.info { color: #ffd43b; }
 label span { color: #ff6b6b; }
 @media (max-width: 700px) {
   .form-grid { grid-template-columns: 1fr; }
@@ -109,6 +110,37 @@ label span { color: #ff6b6b; }
 .modal-btn { padding: 10px 20px; border-radius: 8px; font-weight: bold; cursor: pointer; border: none; font-size: 1rem; width: auto; }
 .btn-copy { background: #69db7c; color: #000; }
 .btn-close { background: #ff6b6b; color: #fff; }
+
+/* ✅ API Banner - تحذير لو السيرفر مش شغال */
+#apiBanner {
+  display: none;
+  background: rgba(255, 107, 107, 0.15);
+  border: 1px solid #ff6b6b;
+  color: #ffb3b3;
+  padding: 12px 15px;
+  border-radius: 10px;
+  margin-bottom: 20px;
+  font-size: 0.95rem;
+  font-weight: 600;
+  text-align: center;
+}
+
+/* ✅ Recovery Banner - استرداد البيانات المفقودة */
+.recovery-banner {
+  display: none;
+  background: rgba(255, 212, 59, 0.12);
+  border: 1px solid rgba(255, 212, 59, 0.4);
+  border-radius: 10px;
+  padding: 14px 16px;
+  margin-bottom: 20px;
+  font-size: 0.95rem;
+  color: #ffd43b;
+}
+.recovery-banner.visible { display: block; }
+.recovery-banner button {
+  margin-top: 10px;
+  background: #ffd43b;
+}
 </style>
 <base target="_blank">
 </head>
@@ -116,6 +148,16 @@ label span { color: #ff6b6b; }
 <div class="container">
   <h1>Skip Task Tracker</h1>
   <p class="prayer-text">❤️ ادعوا لأخونا علي ويكا بالرحمة والمغفرة ❤️</p>
+
+  <!-- ✅ API Health Banner -->
+  <div id="apiBanner">⚠️ Cannot reach the server right now. Your submission may fail — please inform the admin before submitting.</div>
+
+  <!-- ✅ Recovery Banner -->
+  <div id="recoveryBanner" class="recovery-banner">
+    <div id="recoveryText"></div>
+    <button type="button" id="recoveryRetryBtn">Resend Now</button>
+  </div>
+
   <form id="taskForm" autocomplete="off">
     <div class="form-grid">
       <div class="form-group full-width">
@@ -269,17 +311,12 @@ label span { color: #ff6b6b; }
 
 <script>
 /* =====================================================
-   ✅ رابط الـ API — وضع مزدوج (Dual Mode):
-   - لو الصفحة معمولة Serve من Apps Script (?action=form) → الرابط بيتملي أوتوماتيك
-   - لو الصفحة مستضافة خارجياً → حط رابط الـ /exec في MANUAL_URL
-
-   ⚠️ مهم جداً بعد أي Deploy جديد:
-   لازم تستبدل القيمة تحت بآخر رابط /exec ظاهر في
-   Deploy > Manage deployments بعد عمل "New version".
-   رابط الاختبار السريع: MANUAL_URL + "?action=ping"
+   ✅ رابط الـ API — وضع مزدوج (Dual Mode)
+   ⚠️ بعد أي Deploy جديد: استخدم Deploy > Manage deployments > ✏️ (Edit) > New version
+   — الرابط /exec مش بيتغير أبداً بالطريقة دي.
 ===================================================== */
 const INJECTED_URL = "<?= apiUrl ?>";
-const MANUAL_URL = "https://script.google.com/macros/s/AKfycbzkGC2SBVWjr8DtffZ_bNDcHB7iqTN_CNUeZy2Zn0AupwP1SBgcgKZ-8HKymvAuqeRw5Q/exec";
+const MANUAL_URL = "https://script.google.com/macros/s/AKfycbzuKLOZdjoJVAGwgQHWpGbChEB_nWRCHAfzyehoRVbWQsLbcE3RGtArVj76JraChFri1A/exec";
 const API_URL = (INJECTED_URL && INJECTED_URL.indexOf("<?=") === -1) ? INJECTED_URL : MANUAL_URL;
 
 const form = document.getElementById('taskForm');
@@ -306,6 +343,48 @@ const shiftSelect = document.getElementById('shift');
 const submitBtn = document.getElementById('submitBtn');
 const customModal = document.getElementById('customModal');
 const modalMessage = document.getElementById('modalMessage');
+const apiBanner = document.getElementById('apiBanner');
+const recoveryBanner = document.getElementById('recoveryBanner');
+const recoveryText = document.getElementById('recoveryText');
+const recoveryRetryBtn = document.getElementById('recoveryRetryBtn');
+
+/* =====================================================
+   ✅ Reliability Layer - localStorage Recovery
+===================================================== */
+const PENDING_KEY = 'skipTaskTracker_pendingSubmission_v1';
+let currentSubmissionId = null;
+
+function generateId() {
+  if (window.crypto && typeof window.crypto.randomUUID === 'function') {
+    return window.crypto.randomUUID();
+  }
+  return 'id-' + Date.now() + '-' + Math.random().toString(16).slice(2);
+}
+
+function ensureSubmissionId() {
+  if (!currentSubmissionId) currentSubmissionId = generateId();
+  return currentSubmissionId;
+}
+
+function savePendingSubmission(dataWithId) {
+  try {
+    localStorage.setItem(PENDING_KEY, JSON.stringify({
+      data: dataWithId,
+      savedAt: new Date().toISOString()
+    }));
+  } catch (e) { /* localStorage غير متاح */ }
+}
+
+function clearPendingSubmission() {
+  try { localStorage.removeItem(PENDING_KEY); } catch (e) {}
+}
+
+function loadPendingSubmission() {
+  try {
+    const raw = localStorage.getItem(PENDING_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch (e) { return null; }
+}
 
 /* ---------- Timestamp ---------- */
 function setTimestamp() {
@@ -320,6 +399,32 @@ function setTimestamp() {
 }
 setTimestamp();
 setInterval(setTimestamp, 1000);
+
+/* =====================================================
+   ✅ API Health Check on Load
+===================================================== */
+(async function checkApiOnLoad() {
+  try {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 20000);
+    const res = await fetch(API_URL + "?action=ping", { signal: controller.signal, cache: "no-store" });
+    clearTimeout(timer);
+    const text = await res.text();
+    let data = null;
+    try { data = JSON.parse(text); } catch (e) { data = null; }
+    if (!data || !data.ok) apiBanner.style.display = 'block';
+  } catch (e) {
+    setTimeout(async () => {
+      try {
+        const r = await fetch(API_URL + "?action=ping", { cache: "no-store" });
+        const t = await r.text();
+        if (t.indexOf('"ok":true') === -1 && t.indexOf('"ok": true') === -1) {
+          apiBanner.style.display = 'block';
+        }
+      } catch (e2) { apiBanner.style.display = 'block'; }
+    }, 3000);
+  }
+})();
 
 /* ---------- Dynamic Groups ---------- */
 function hideAllDynamicGroups() {
@@ -459,12 +564,11 @@ function getGulpMessage() {
 }
 
 /* =====================================================
-   ✅ الـ Fetch الآمن — وفيه دلوقتي تشخيص أدق للسبب
-   بدل رسالة "Unexpected token '<'" العمياء
+   ✅ Single Low-Level Attempt (60s timeout)
 ===================================================== */
-async function postJSON(payload) {
+async function singleAttempt(payload) {
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), 45000);
+  const timer = setTimeout(() => controller.abort(), 60000);
   let res;
   try {
     res = await fetch(API_URL, {
@@ -477,37 +581,112 @@ async function postJSON(payload) {
   } catch (netErr) {
     clearTimeout(timer);
     if (netErr && netErr.name === 'AbortError') {
-      throw new Error('Server took too long to respond. Please try again.');
+      const e = new Error('Server took too long to respond.');
+      e.retryable = true;
+      throw e;
     }
-    throw new Error('Cannot connect to the server. Check your internet connection.');
+    const e = new Error('Cannot connect to the server. Check your internet connection.');
+    e.retryable = true;
+    throw e;
   }
   clearTimeout(timer);
 
-  // ✅ قراءة النص أولاً ثم محاولة parse بأمان (مفيش res.json() أعمى تاني)
   const text = await res.text();
   let data = null;
   try { data = JSON.parse(text); } catch (e) { data = null; }
 
   if (!data || typeof data !== 'object') {
-    console.error('Non-JSON response received. Status:', res.status, 'Body:', text.slice(0, 400));
+    console.error('Non-JSON response. Status:', res.status, 'Body:', text.slice(0, 400));
     const lower = text.toLowerCase();
 
-    // تشخيص دقيق للسبب بدل رسالة عامة
     if (lower.indexOf('accounts.google.com') !== -1 || lower.indexOf('servicelogin') !== -1 || lower.indexOf('signin') !== -1) {
-      throw new Error('This form is not public yet. Admin: redeploy the Web App with "Who has access: Anyone" (not "Anyone with Google account").');
+      const e = new Error('This form is not public yet. Admin: redeploy with "Who has access: Anyone".');
+      e.retryable = false;
+      throw e;
     }
     if (res.status === 404) {
-      throw new Error('The deployment link is invalid or was deleted (404). Admin: get a fresh /exec link from Deploy > Manage deployments.');
+      apiBanner.style.display = 'block';
+      const e = new Error('DEPLOYMENT LINK IS DEAD (404). Admin: verify the /exec link is the latest one.');
+      e.retryable = false;
+      throw e;
     }
     if (res.status >= 500) {
-      throw new Error('The script crashed before responding (Error ' + res.status + '). Admin: check Apps Script > Executions log.');
+      const e = new Error('The script crashed (Error ' + res.status + ').');
+      e.retryable = true;
+      throw e;
     }
-    throw new Error('Server returned a page instead of data. Admin: verify the deployment is "New version" + "Execute as: Me" + "Who has access: Anyone", and that API_URL is the latest /exec link.');
+    const e = new Error('Server returned a page instead of data.');
+    e.retryable = true;
+    throw e;
   }
+
+  if (!data.ok) {
+    const isBusy = data.retryable === true;
+    const e = new Error(data.error || 'Server rejected the data.');
+    e.retryable = isBusy;
+    throw e;
+  }
+
   return data;
 }
 
-/* ---------- Submit ---------- */
+/* =====================================================
+   ✅ postJSON with Exponential Backoff (4 attempts)
+===================================================== */
+async function postJSON(payload, onAttempt) {
+  const delays = [1500, 3000, 6000];
+  let lastErr;
+  for (let attempt = 1; attempt <= delays.length + 1; attempt++) {
+    if (onAttempt) onAttempt(attempt, delays.length + 1);
+    try {
+      return await singleAttempt(payload);
+    } catch (err) {
+      lastErr = err;
+      if (!err.retryable || attempt === delays.length + 1) {
+        throw err;
+      }
+      await new Promise(r => setTimeout(r, delays[attempt - 1]));
+    }
+  }
+  throw lastErr;
+}
+
+/* =====================================================
+   ✅ Recovery Logic
+===================================================== */
+async function attemptRecovery() {
+  const pending = loadPendingSubmission();
+  if (!pending || !pending.data) return;
+
+  recoveryBanner.classList.add('visible');
+  recoveryText.textContent = 'Found an unsent submission from a previous session. Attempting to resend it automatically...';
+  recoveryRetryBtn.style.display = 'none';
+
+  try {
+    const result = await postJSON(pending.data, (attempt, total) => {
+      recoveryText.textContent = 'Resending previous submission... (attempt ' + attempt + ' of ' + total + ')';
+    });
+    if (result.ok) {
+      clearPendingSubmission();
+      recoveryText.textContent = 'Previous submission was recovered and saved successfully ✅';
+      setTimeout(() => recoveryBanner.classList.remove('visible'), 4000);
+    }
+  } catch (err) {
+    recoveryText.textContent = 'Could not resend the previous submission (' + (err.message || 'error') + '). It is still saved locally.';
+    recoveryRetryBtn.style.display = 'block';
+  }
+}
+
+recoveryRetryBtn.addEventListener('click', function () {
+  recoveryRetryBtn.style.display = 'none';
+  attemptRecovery();
+});
+
+window.addEventListener('load', attemptRecovery);
+
+/* =====================================================
+   ✅ Form Submit Handler
+===================================================== */
 form.addEventListener('submit', async function (e) {
   e.preventDefault();
 
@@ -586,6 +765,7 @@ form.addEventListener('submit', async function (e) {
   }
 
   const data = {
+    submissionId: ensureSubmissionId(),
     timestamp: formData.get('timestamp'),
     labelerName: finalLabelerName,
     user: finalUser,
@@ -602,20 +782,29 @@ form.addEventListener('submit', async function (e) {
     shift: formData.get('shift')
   };
 
-  // ✅ قفل الزرار لمنع الدبل سبمت
+  // ✅ Save locally BEFORE sending
+  savePendingSubmission(data);
+
   submitBtn.disabled = true;
   setStatus('Submitting...', '');
 
   try {
-    const result = await postJSON(data);
+    const result = await postJSON(data, (attempt, total) => {
+      if (attempt > 1) {
+        setStatus('Retrying submission... (attempt ' + attempt + ' of ' + total + ')', 'info');
+      }
+    });
     if (!result.ok) throw new Error(result.error || 'Server rejected the data.');
+    
+    clearPendingSubmission();
+    currentSubmissionId = null;
     showModal(getGulpMessage());
     form.reset();
     setTimestamp();
     hideAllDynamicGroups();
     setStatus('', '');
   } catch (err) {
-    setStatus('Failed ❌: ' + (err.message || 'Unexpected error.'), 'error');
+    setStatus('Failed ❌: ' + (err.message || 'Unexpected error.') + ' — Your data is saved locally, click Submit to try again.', 'error');
   } finally {
     submitBtn.disabled = false;
   }
