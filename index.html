@@ -311,13 +311,19 @@ label span { color: #ff6b6b; }
 
 <script>
 /* =====================================================
-   ✅ رابط الـ API — وضع مزدوج (Dual Mode)
-   ⚠️ بعد أي Deploy جديد: استخدم Deploy > Manage deployments > ✏️ (Edit) > New version
-   — الرابط /exec مش بيتغير أبداً بالطريقة دي.
+   ✅ رابط الـ API — Self-Healing
+   1) لو الفورم متفتح من رابط السكربت نفسه (?action=form) → الرابط بيتحقن تلقائياً وبيبقى دايماً صح.
+   2) لو الفورم مستضاف في مكان تاني → بيستخدم MANUAL_URL.
+   3) لو الرابط مات (404) → الفورم بيقرا الرابط الحالي من شيت _config
+      (منشور كـ CSV) ويكمل لوحده من غير ما المستخدم يحس.
 ===================================================== */
 const INJECTED_URL = "<?= apiUrl ?>";
 const MANUAL_URL = "https://script.google.com/macros/s/AKfycbxzbMr1FMIC3VEuJbCR2L4D0N2PhY3aD5D8LuC_pIwn-HRnQobqc1IkM-1wap0H-yqvXQ/exec";
-const API_URL = (INJECTED_URL && INJECTED_URL.indexOf("<?=") === -1) ? INJECTED_URL : MANUAL_URL;
+
+// 👇 الصق هنا رابط الـ CSV المنشور لتاب _config (الخطوات في الشرح). سيبه "" لو لسه مش جاهز.
+const CONFIG_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSfb848v42ECFY6rHIOGtVX4mIheiEQHDKNYpv4NTtcnQ2UuwbvY7aXp6Bci4U_hIihqH7xHgoi9F_L/pubhtml?gid=1278756710&single=true ";
+
+let API_URL = (INJECTED_URL && INJECTED_URL.indexOf("<?=") === -1) ? INJECTED_URL : MANUAL_URL;
 
 const form = document.getElementById('taskForm');
 const issueSelect = document.getElementById('issue');
@@ -347,6 +353,38 @@ const apiBanner = document.getElementById('apiBanner');
 const recoveryBanner = document.getElementById('recoveryBanner');
 const recoveryText = document.getElementById('recoveryText');
 const recoveryRetryBtn = document.getElementById('recoveryRetryBtn');
+
+/* =====================================================
+   ✅ Self-Healing: قراءة الرابط الحالي من _config
+===================================================== */
+async function healApiUrl() {
+  if (!CONFIG_CSV_URL) return false;
+  try {
+    const sep = CONFIG_CSV_URL.indexOf('?') > -1 ? '&' : '?';
+    const r = await fetch(CONFIG_CSV_URL + sep + 't=' + Date.now(), { cache: 'no-store' });
+    const txt = await r.text();
+    const m = txt.match(/https:\/\/script\.google\.com\/[^\s",]*\/exec/);
+    if (m && m[0] !== API_URL) {
+      API_URL = m[0];
+      apiBanner.style.display = 'none';
+      return true;
+    }
+  } catch (e) { /* ignore */ }
+  return false;
+}
+
+async function pingOk(url) {
+  try {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 20000);
+    const res = await fetch(url + "?action=ping", { signal: controller.signal, cache: "no-store" });
+    clearTimeout(timer);
+    const text = await res.text();
+    let data = null;
+    try { data = JSON.parse(text); } catch (e) { data = null; }
+    return !!(data && data.ok);
+  } catch (e) { return false; }
+}
 
 /* =====================================================
    ✅ Reliability Layer - localStorage Recovery
@@ -401,29 +439,20 @@ setTimestamp();
 setInterval(setTimestamp, 1000);
 
 /* =====================================================
-   ✅ API Health Check on Load
+   ✅ API Health Check on Load (مع Self-Healing)
 ===================================================== */
 (async function checkApiOnLoad() {
-  try {
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 20000);
-    const res = await fetch(API_URL + "?action=ping", { signal: controller.signal, cache: "no-store" });
-    clearTimeout(timer);
-    const text = await res.text();
-    let data = null;
-    try { data = JSON.parse(text); } catch (e) { data = null; }
-    if (!data || !data.ok) apiBanner.style.display = 'block';
-  } catch (e) {
-    setTimeout(async () => {
-      try {
-        const r = await fetch(API_URL + "?action=ping", { cache: "no-store" });
-        const t = await r.text();
-        if (t.indexOf('"ok":true') === -1 && t.indexOf('"ok": true') === -1) {
-          apiBanner.style.display = 'block';
-        }
-      } catch (e2) { apiBanner.style.display = 'block'; }
-    }, 3000);
+  let ok = await pingOk(API_URL);
+  if (!ok) {
+    // جرّب تجيب الرابط الحالي من _config
+    if (await healApiUrl()) ok = await pingOk(API_URL);
   }
+  if (!ok) {
+    // محاولة أخيرة بعد 3 ثواني
+    await new Promise(r => setTimeout(r, 3000));
+    ok = await pingOk(API_URL);
+  }
+  if (!ok) apiBanner.style.display = 'block';
 })();
 
 /* ---------- Dynamic Groups ---------- */
@@ -604,10 +633,11 @@ async function singleAttempt(payload) {
       e.retryable = false;
       throw e;
     }
-    if (res.status === 404) {
-      apiBanner.style.display = 'block';
+    // ✅ 404 أو صفحة "unable to open the file" = الـ Deployment مات → نحاول نتعافى تلقائياً
+    if (res.status === 404 || lower.indexOf('unable to open the file') !== -1 || lower.indexOf('page not found') !== -1) {
       const e = new Error('DEPLOYMENT LINK IS DEAD (404). Admin: verify the /exec link is the latest one.');
       e.retryable = false;
+      e.dead = true;
       throw e;
     }
     if (res.status >= 500) {
@@ -631,21 +661,31 @@ async function singleAttempt(payload) {
 }
 
 /* =====================================================
-   ✅ postJSON with Exponential Backoff (4 attempts)
+   ✅ postJSON with Exponential Backoff (4 attempts) + Self-Healing
 ===================================================== */
 async function postJSON(payload, onAttempt) {
   const delays = [1500, 3000, 6000];
+  const total = delays.length + 1;
   let lastErr;
-  for (let attempt = 1; attempt <= delays.length + 1; attempt++) {
-    if (onAttempt) onAttempt(attempt, delays.length + 1);
+  let healed = false;
+  let attempt = 1;
+
+  while (attempt <= total) {
+    if (onAttempt) onAttempt(attempt, total);
     try {
       return await singleAttempt(payload);
     } catch (err) {
       lastErr = err;
-      if (!err.retryable || attempt === delays.length + 1) {
-        throw err;
+
+      // ✅ الرابط مات → هات الرابط الجديد من _config وكرر نفس المحاولة
+      if (err.dead && !healed) {
+        healed = true;
+        if (await healApiUrl()) continue;
       }
+
+      if (!err.retryable || attempt === total) throw err;
       await new Promise(r => setTimeout(r, delays[attempt - 1]));
+      attempt++;
     }
   }
   throw lastErr;
@@ -795,7 +835,7 @@ form.addEventListener('submit', async function (e) {
       }
     });
     if (!result.ok) throw new Error(result.error || 'Server rejected the data.');
-    
+
     clearPendingSubmission();
     currentSubmissionId = null;
     showModal(getGulpMessage());
