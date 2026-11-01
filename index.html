@@ -238,6 +238,16 @@ label span { color: #ff6b6b; }
           <option value="Overnight">Overnight</option>
         </select>
       </div>
+      <!-- ✅ QA Case — بيظهر ويبقى إجباري لما Modality = LIDAR QA -->
+      <div class="form-group full-width hidden-group" id="qaCaseGroup">
+        <label for="qaCase">QA Case <span>*</span></label>
+        <select id="qaCase" name="qaCase">
+          <option value="" disabled selected>Select QA Case...</option>
+          <option value="None">None</option>
+          <option value="Incomplete task need extra time">Incomplete task need extra time</option>
+          <option value="Empty (0 Objects)">Empty (0 Objects)</option>
+        </select>
+      </div>
       <div class="form-group full-width">
         <label for="issue">Issue <span>*</span></label>
         <select id="issue" name="issue" required>
@@ -300,10 +310,10 @@ label span { color: #ff6b6b; }
 <div id="customModal" class="modal-overlay">
   <div class="modal-content">
     <h2>Task Submitted ✅</h2>
-    <p style="margin-bottom: 10px; font-size: 0.9rem; color:#aaa;">Please copy the message below to GULP description box:</p>
+    <p id="modalHint" style="margin-bottom: 10px; font-size: 0.9rem; color:#aaa;">Please copy the message below to GULP description box:</p>
     <div id="modalMessage" class="message-box"></div>
     <div class="modal-buttons">
-      <button class="modal-btn btn-copy" onclick="copyModalMessage()">Copy Message</button>
+      <button id="copyBtn" class="modal-btn btn-copy" onclick="copyModalMessage()">Copy Message</button>
       <button class="modal-btn btn-close" onclick="closeModal()">Close</button>
     </div>
   </div>
@@ -321,7 +331,10 @@ const INJECTED_URL = "<?= apiUrl ?>";
 const MANUAL_URL = "https://script.google.com/macros/s/AKfycbxzbMr1FMIC3VEuJbCR2L4D0N2PhY3aD5D8LuC_pIwn-HRnQobqc1IkM-1wap0H-yqvXQ/exec";
 
 // 👇 الصق هنا رابط الـ CSV المنشور لتاب _config (الخطوات في الشرح). سيبه "" لو لسه مش جاهز.
-const CONFIG_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSfb848v42ECFY6rHIOGtVX4mIheiEQHDKNYpv4NTtcnQ2UuwbvY7aXp6Bci4U_hIihqH7xHgoi9F_L/pubhtml?gid=1278756710&single=true ";
+const CONFIG_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSfb848v42ECFY6rHIOGtVX4mIheiEQHDKNYpv4NTtcnQ2UuwbvY7aXp6Bci4U_hIihqH7xHgoi9F_L/pubhtml?gid=1278756710&single=true";
+
+// ✅ نسخة الفورم (الباك إند بيستخدمها عشان يطبّق شرط QA Case على الفورم الجديد بس)
+const FORM_VERSION = 10;
 
 let API_URL = (INJECTED_URL && INJECTED_URL.indexOf("<?=") === -1) ? INJECTED_URL : MANUAL_URL;
 
@@ -346,9 +359,16 @@ const userInput = document.getElementById('userInput');
 const labelerNameInput = document.getElementById('labelerName');
 const qcNameInput = document.getElementById('qcName');
 const shiftSelect = document.getElementById('shift');
+const taskTypeSelect = document.getElementById('taskType');
+const modalitySelect = document.getElementById('modality');
+const passSelect = document.getElementById('passStatus');
+const qaCaseGroup = document.getElementById('qaCaseGroup');
+const qaCaseSelect = document.getElementById('qaCase');
 const submitBtn = document.getElementById('submitBtn');
 const customModal = document.getElementById('customModal');
 const modalMessage = document.getElementById('modalMessage');
+const modalHint = document.getElementById('modalHint');
+const copyBtn = document.getElementById('copyBtn');
 const apiBanner = document.getElementById('apiBanner');
 const recoveryBanner = document.getElementById('recoveryBanner');
 const recoveryText = document.getElementById('recoveryText');
@@ -358,10 +378,11 @@ const recoveryRetryBtn = document.getElementById('recoveryRetryBtn');
    ✅ Self-Healing: قراءة الرابط الحالي من _config
 ===================================================== */
 async function healApiUrl() {
-  if (!CONFIG_CSV_URL) return false;
+  const csvUrl = String(CONFIG_CSV_URL || "").trim();
+  if (!csvUrl) return false;
   try {
-    const sep = CONFIG_CSV_URL.indexOf('?') > -1 ? '&' : '?';
-    const r = await fetch(CONFIG_CSV_URL + sep + 't=' + Date.now(), { cache: 'no-store' });
+    const sep = csvUrl.indexOf('?') > -1 ? '&' : '?';
+    const r = await fetch(csvUrl + sep + 't=' + Date.now(), { cache: 'no-store' });
     const txt = await r.text();
     const m = txt.match(/https:\/\/script\.google\.com\/[^\s",]*\/exec/);
     if (m && m[0] !== API_URL) {
@@ -455,6 +476,45 @@ setInterval(setTimestamp, 1000);
   if (!ok) apiBanner.style.display = 'block';
 })();
 
+/* =====================================================
+   ✅ QA Case + Auto-fill من اللينك
+   - لو اللينك فيه SellIvandarQA:
+       Task Type = LIDAR ، Modality = LIDAR QA ، Pass = QA
+   - لو Modality = LIDAR QA → يظهر QA Case ويبقى إجباري
+===================================================== */
+const QA_LINK_REGEX = /SellIvandarQA/i;
+let qaAutoFilled = false;
+
+function toggleQaCase() {
+  if (modalitySelect.value === 'LIDAR QA') {
+    qaCaseGroup.classList.add('visible');
+    qaCaseSelect.setAttribute('required', 'required');
+  } else {
+    qaCaseGroup.classList.remove('visible');
+    qaCaseSelect.removeAttribute('required');
+    qaCaseSelect.value = '';
+  }
+}
+
+function applyQaLinkAutoFill() {
+  const isQaLink = QA_LINK_REGEX.test(taskLinkInput.value);
+  if (isQaLink) {
+    taskTypeSelect.value = 'LIDAR';
+    modalitySelect.value = 'LIDAR QA';
+    passSelect.value = 'QA';
+    qaAutoFilled = true;
+  } else if (qaAutoFilled) {
+    // اللينك اتغيّر ومبقاش QA → نرجّع الحقول اللي اتملت أوتوماتيك
+    taskTypeSelect.value = '';
+    modalitySelect.value = '';
+    passSelect.value = '';
+    qaAutoFilled = false;
+  }
+  toggleQaCase();
+}
+
+modalitySelect.addEventListener('change', toggleQaCase);
+
 /* ---------- Dynamic Groups ---------- */
 function hideAllDynamicGroups() {
   issuedFramesGroup.classList.remove('visible');
@@ -516,10 +576,11 @@ function validateFrame(input) {
   if (input.value.length > 3) input.value = input.value.slice(0, 3);
 }
 
-/* ---------- Auto-fill Task ID ---------- */
+/* ---------- Auto-fill Task ID (+ Auto-fill QA fields) ---------- */
 taskLinkInput.addEventListener('input', function () {
   const match = this.value.match(/\/id\/(\d+)/);
   if (match && match[1]) taskIdInput.value = match[1];
+  applyQaLinkAutoFill();
 });
 
 /* ---------- Helpers ---------- */
@@ -562,14 +623,21 @@ function setStatus(msg, type) {
   statusPara.className = type || '';
 }
 
-/* ---------- Modal ---------- */
+/* ---------- Modal ----------
+   ✅ لو مفيش رسالة (مفيش حاجة تتكوبي لـ GULP) → بنخفي الجملة وصندوق الرسالة وزرار Copy
+      ويفضل بس "Task Submitted ✅" وزرار Close. */
 function showModal(message) {
-  modalMessage.innerText = message;
+  const hasMessage = !!(message && String(message).trim());
+  modalMessage.innerText = hasMessage ? message : '';
+  modalHint.style.display = hasMessage ? 'block' : 'none';
+  modalMessage.style.display = hasMessage ? 'block' : 'none';
+  copyBtn.style.display = hasMessage ? 'inline-block' : 'none';
   customModal.style.display = 'flex';
 }
 function closeModal() { customModal.style.display = 'none'; }
 function copyModalMessage() {
   const text = modalMessage.innerText;
+  if (!text) return;
   navigator.clipboard.writeText(text).then(() => {
     const btn = document.querySelector('.btn-copy');
     const originalText = btn.innerText;
@@ -579,6 +647,7 @@ function copyModalMessage() {
   }).catch(() => { alert("Failed to copy text."); });
 }
 
+/* ✅ الرسالة الافتراضية اتشالت: بترجع "" لو مفيش رسالة مخصوصة */
 function getGulpMessage() {
   const issueVal = issueSelect.value;
   const start = frameStartInput.value;
@@ -589,7 +658,7 @@ function getGulpMessage() {
   if (issueVal === "Other" && otherSubIssueSelect.value === "Lidar points shifting vertically") {
     return "Lidar Shift Vertically from " + start + " to " + end;
   }
-  return "Task Submitted Successfully";
+  return "";
 }
 
 /* =====================================================
@@ -751,6 +820,12 @@ form.addEventListener('submit', async function (e) {
   // 5. Shift
   if (!shiftSelect.value) { setStatus('Error: Please select a Shift.', 'error'); return; }
 
+  // 5.5 QA Case (إجباري لما Modality = LIDAR QA)
+  if (modalitySelect.value === 'LIDAR QA' && !qaCaseSelect.value) {
+    setStatus('Error: Please select a QA Case.', 'error');
+    return;
+  }
+
   // 6. Frames
   if (issuedFramesGroup.classList.contains('visible')) {
     const start = parseInt(frameStartInput.value);
@@ -804,7 +879,11 @@ form.addEventListener('submit', async function (e) {
     finalFrames = "from frame " + frameStartInput.value + " to frame " + frameEndInput.value;
   }
 
+  const finalModality = formData.get('modality');
+  const finalQaCase = (finalModality === 'LIDAR QA') ? qaCaseSelect.value : "";
+
   const data = {
+    formVersion: FORM_VERSION,
     submissionId: ensureSubmissionId(),
     timestamp: formData.get('timestamp'),
     labelerName: finalLabelerName,
@@ -814,12 +893,13 @@ form.addEventListener('submit', async function (e) {
     taskId: formData.get('taskId'),
     taskType: formData.get('taskType'),
     queueName: formData.get('queueName'),
-    modality: formData.get('modality'),
+    modality: finalModality,
     passStatus: formData.get('passStatus'),
     issue: finalIssue,
     issuedFrames: finalFrames,
     edgeCaseDesc: edgeCaseDescInput.value.trim() || "",
-    shift: formData.get('shift')
+    shift: formData.get('shift'),
+    qaCase: finalQaCase
   };
 
   // ✅ Save locally BEFORE sending
@@ -842,6 +922,8 @@ form.addEventListener('submit', async function (e) {
     form.reset();
     setTimestamp();
     hideAllDynamicGroups();
+    qaAutoFilled = false;
+    toggleQaCase();
     setStatus('', '');
   } catch (err) {
     setStatus('Failed ❌: ' + (err.message || 'Unexpected error.') + ' — Your data is saved locally, click Submit to try again.', 'error');
