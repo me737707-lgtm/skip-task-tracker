@@ -334,7 +334,7 @@ const MANUAL_URL = "https://script.google.com/macros/s/AKfycbxzbMr1FMIC3VEuJbCR2
 const CONFIG_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSfb848v42ECFY6rHIOGtVX4mIheiEQHDKNYpv4NTtcnQ2UuwbvY7aXp6Bci4U_hIihqH7xHgoi9F_L/pubhtml?gid=1278756710&single=true";
 
 // ✅ نسخة الفورم (الباك إند بيستخدمها عشان يطبّق شرط QA Case على الفورم الجديد بس)
-const FORM_VERSION = 10;
+const FORM_VERSION = 11;
 
 let API_URL = (INJECTED_URL && INJECTED_URL.indexOf("<?=") === -1) ? INJECTED_URL : MANUAL_URL;
 
@@ -408,10 +408,17 @@ async function pingOk(url) {
 }
 
 /* =====================================================
-   ✅ Reliability Layer - localStorage Recovery
+   ✅ Reliability Layer v11 — طابور محلي (localStorage Queue)
+   - كل تقرير بيتحفظ بـ submissionId بتاعه (مفيش تقرير بيمسح التاني).
+   - التقرير بيتشال بس لما السيرفر يرد ok.
+   - لو السيرفر رفض تقرير بشكل نهائي بيتعلّم "rejected" وما بيتعادش تلقائياً (بس يدوي).
 ===================================================== */
-const PENDING_KEY = 'skipTaskTracker_pendingSubmission_v1';
+const PENDING_KEY = 'skipTaskTracker_pendingQueue_v2';
+const OLD_PENDING_KEY = 'skipTaskTracker_pendingSubmission_v1';
 let currentSubmissionId = null;
+let lastSubmitSig = null;
+let isSubmitting = false;
+let recovering = false;
 
 function generateId() {
   if (window.crypto && typeof window.crypto.randomUUID === 'function') {
@@ -425,24 +432,61 @@ function ensureSubmissionId() {
   return currentSubmissionId;
 }
 
-function savePendingSubmission(dataWithId) {
-  try {
-    localStorage.setItem(PENDING_KEY, JSON.stringify({
-      data: dataWithId,
-      savedAt: new Date().toISOString()
-    }));
-  } catch (e) { /* localStorage غير متاح */ }
+function writeQueue(q) {
+  try { localStorage.setItem(PENDING_KEY, JSON.stringify(q)); return true; } catch (e) { return false; }
 }
 
-function clearPendingSubmission() {
-  try { localStorage.removeItem(PENDING_KEY); } catch (e) {}
-}
-
-function loadPendingSubmission() {
+function readQueue() {
+  let q = [];
   try {
     const raw = localStorage.getItem(PENDING_KEY);
-    return raw ? JSON.parse(raw) : null;
-  } catch (e) { return null; }
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) q = parsed.filter(x => x && x.data);
+    }
+  } catch (e) { q = []; }
+
+  // ترحيل الصيغة القديمة (تقرير واحد) للطابور الجديد
+  try {
+    const oldRaw = localStorage.getItem(OLD_PENDING_KEY);
+    if (oldRaw) {
+      const old = JSON.parse(oldRaw);
+      if (old && old.data) {
+        const oid = old.data.submissionId;
+        const exists = oid && q.some(x => x.data.submissionId === oid);
+        if (!exists) q.push({ data: old.data, savedAt: old.savedAt || new Date().toISOString() });
+      }
+      if (writeQueue(q)) localStorage.removeItem(OLD_PENDING_KEY);
+    }
+  } catch (e) { /* ignore */ }
+  return q;
+}
+
+function savePendingSubmission(data) {
+  const q = readQueue();
+  const idx = q.findIndex(x => x.data.submissionId === data.submissionId);
+  const entry = { data: data, savedAt: new Date().toISOString() };
+  if (idx > -1) {
+    entry.savedAt = q[idx].savedAt || entry.savedAt;
+    q[idx] = entry;
+  } else {
+    q.push(entry);
+  }
+  writeQueue(q);
+}
+
+function removePending(id) {
+  if (!id) return;
+  const q = readQueue().filter(x => x.data.submissionId !== id);
+  writeQueue(q);
+}
+
+function markRejected(id, msg) {
+  const q = readQueue();
+  q.forEach(x => {
+    if (x.data.submissionId === id) { x.rejected = true; x.lastError = msg || 'rejected'; }
+  });
+  writeQueue(q);
 }
 
 /* ---------- Timestamp ---------- */
@@ -624,8 +668,8 @@ function setStatus(msg, type) {
 }
 
 /* ---------- Modal ----------
-   ✅ لو مفيش رسالة (مفيش حاجة تتكوبي لـ GULP) → بنخفي الجملة وصندوق الرسالة وزرار Copy
-      ويفضل بس "Task Submitted ✅" وزرار Close. */
+   لو مفيش رسالة (مفيش حاجة تتكوبي لـ GULP) → بنخفي الجملة وصندوق الرسالة وزرار Copy
+   ويفضل بس "Task Submitted ✅" وزرار Close. */
 function showModal(message) {
   const hasMessage = !!(message && String(message).trim());
   modalMessage.innerText = hasMessage ? message : '';
@@ -647,7 +691,7 @@ function copyModalMessage() {
   }).catch(() => { alert("Failed to copy text."); });
 }
 
-/* ✅ الرسالة الافتراضية اتشالت: بترجع "" لو مفيش رسالة مخصوصة */
+/* الرسالة الافتراضية اتشالت: بترجع "" لو مفيش رسالة مخصوصة */
 function getGulpMessage() {
   const issueVal = issueSelect.value;
   const start = frameStartInput.value;
@@ -696,13 +740,20 @@ async function singleAttempt(payload) {
   if (!data || typeof data !== 'object') {
     console.error('Non-JSON response. Status:', res.status, 'Body:', text.slice(0, 400));
     const lower = text.toLowerCase();
+    const finalUrl = String(res.url || '').toLowerCase();
 
-    if (lower.indexOf('accounts.google.com') !== -1 || lower.indexOf('servicelogin') !== -1 || lower.indexOf('signin') !== -1) {
+    // ✅ v11: صفحة تسجيل الدخول الحقيقية بس (مش أي صفحة فيها كلمة signin)
+    const looksLikeLogin =
+      finalUrl.indexOf('accounts.google.com') !== -1 ||
+      lower.indexOf('servicelogin') !== -1 ||
+      lower.indexOf('accounts.google.com/signin') !== -1 ||
+      lower.indexOf('accounts.google.com/v3/signin') !== -1;
+    if (looksLikeLogin) {
       const e = new Error('This form is not public yet. Admin: redeploy with "Who has access: Anyone".');
       e.retryable = false;
       throw e;
     }
-    // ✅ 404 أو صفحة "unable to open the file" = الـ Deployment مات → نحاول نتعافى تلقائياً
+    // 404 أو صفحة "unable to open the file" = الـ Deployment مات → نحاول نتعافى تلقائياً
     if (res.status === 404 || lower.indexOf('unable to open the file') !== -1 || lower.indexOf('page not found') !== -1) {
       const e = new Error('DEPLOYMENT LINK IS DEAD (404). Admin: verify the /exec link is the latest one.');
       e.retryable = false;
@@ -730,10 +781,11 @@ async function singleAttempt(payload) {
 }
 
 /* =====================================================
-   ✅ postJSON with Exponential Backoff (4 attempts) + Self-Healing
+   ✅ postJSON with Exponential Backoff (6 attempts + jitter) + Self-Healing
+   الـ jitter بيمنع إن كل المستخدمين يعيدوا الإرسال في نفس اللحظة (ضغط على الـ Lock).
 ===================================================== */
 async function postJSON(payload, onAttempt) {
-  const delays = [1500, 3000, 6000];
+  const delays = [1500, 3000, 6000, 10000, 15000];
   const total = delays.length + 1;
   let lastErr;
   let healed = false;
@@ -746,14 +798,15 @@ async function postJSON(payload, onAttempt) {
     } catch (err) {
       lastErr = err;
 
-      // ✅ الرابط مات → هات الرابط الجديد من _config وكرر نفس المحاولة
+      // الرابط مات → هات الرابط الجديد من _config وكرر نفس المحاولة
       if (err.dead && !healed) {
         healed = true;
         if (await healApiUrl()) continue;
       }
 
       if (!err.retryable || attempt === total) throw err;
-      await new Promise(r => setTimeout(r, delays[attempt - 1]));
+      const wait = delays[attempt - 1] + Math.floor(Math.random() * 1000);
+      await new Promise(r => setTimeout(r, wait));
       attempt++;
     }
   }
@@ -761,43 +814,77 @@ async function postJSON(payload, onAttempt) {
 }
 
 /* =====================================================
-   ✅ Recovery Logic
+   ✅ Recovery Logic (طابور)
 ===================================================== */
-async function attemptRecovery() {
-  const pending = loadPendingSubmission();
-  if (!pending || !pending.data) return;
+async function attemptRecovery(manual) {
+  if (recovering) return;
 
+  const all = readQueue().filter(x => x.data.submissionId !== currentSubmissionId);
+  if (!all.length) return;
+
+  const todo = all.filter(x => manual || !x.rejected);
   recoveryBanner.classList.add('visible');
-  recoveryText.textContent = 'Found an unsent submission from a previous session. Attempting to resend it automatically...';
-  recoveryRetryBtn.style.display = 'none';
 
-  try {
-    const result = await postJSON(pending.data, (attempt, total) => {
-      recoveryText.textContent = 'Resending previous submission... (attempt ' + attempt + ' of ' + total + ')';
-    });
-    if (result.ok) {
-      clearPendingSubmission();
-      recoveryText.textContent = 'Previous submission was recovered and saved successfully ✅';
-      setTimeout(() => recoveryBanner.classList.remove('visible'), 4000);
+  if (!todo.length) {
+    recoveryText.textContent = all.length + ' previous submission(s) were rejected by the server and are still saved on this device. Press "Resend Now" to try again, or contact the admin.';
+    recoveryRetryBtn.style.display = 'block';
+    return;
+  }
+
+  recovering = true;
+  recoveryRetryBtn.style.display = 'none';
+  let recovered = 0;
+  let failed = 0;
+  let lastMsg = '';
+
+  for (let i = 0; i < todo.length; i++) {
+    const entry = todo[i];
+    try {
+      await postJSON(entry.data, (attempt, total) => {
+        recoveryText.textContent = 'Resending previous submission ' + (i + 1) + ' of ' + todo.length + '... (attempt ' + attempt + ' of ' + total + ')';
+      });
+      removePending(entry.data.submissionId);
+      recovered++;
+    } catch (err) {
+      failed++;
+      lastMsg = (err && err.message) ? err.message : 'error';
+      if (err && err.retryable === false) markRejected(entry.data.submissionId, lastMsg);
     }
-  } catch (err) {
-    recoveryText.textContent = 'Could not resend the previous submission (' + (err.message || 'error') + '). It is still saved locally.';
+  }
+  recovering = false;
+
+  if (!failed) {
+    recoveryText.textContent = recovered + ' previous submission(s) were recovered and saved successfully ✅';
+    recoveryRetryBtn.style.display = 'none';
+    setTimeout(() => recoveryBanner.classList.remove('visible'), 4000);
+  } else {
+    recoveryText.textContent = 'Recovered ' + recovered + ', but ' + failed + ' could not be resent (' + lastMsg + '). They are still saved on this device.';
     recoveryRetryBtn.style.display = 'block';
   }
 }
 
 recoveryRetryBtn.addEventListener('click', function () {
   recoveryRetryBtn.style.display = 'none';
-  attemptRecovery();
+  attemptRecovery(true);
 });
 
-window.addEventListener('load', attemptRecovery);
+window.addEventListener('load', function () { attemptRecovery(false); });
+
+/* ✅ تحذير لو اليوزر حاول يقفل الصفحة أثناء الإرسال */
+window.addEventListener('beforeunload', function (ev) {
+  if (isSubmitting) {
+    ev.preventDefault();
+    ev.returnValue = '';
+    return '';
+  }
+});
 
 /* =====================================================
    ✅ Form Submit Handler
 ===================================================== */
 form.addEventListener('submit', async function (e) {
   e.preventDefault();
+  if (isSubmitting) return;
 
   // 1. Labeler Name
   const labelerVal = labelerNameInput.value.trim();
@@ -882,10 +969,8 @@ form.addEventListener('submit', async function (e) {
   const finalModality = formData.get('modality');
   const finalQaCase = (finalModality === 'LIDAR QA') ? qaCaseSelect.value : "";
 
-  const data = {
-    formVersion: FORM_VERSION,
-    submissionId: ensureSubmissionId(),
-    timestamp: formData.get('timestamp'),
+  // المحتوى (من غير الـ ID والـ timestamp) — بنقارنه بمحاولة الإرسال السابقة
+  const core = {
     labelerName: finalLabelerName,
     user: finalUser,
     qcName: finalQcName,
@@ -902,9 +987,24 @@ form.addEventListener('submit', async function (e) {
     qaCase: finalQaCase
   };
 
+  // ✅ لو اليوزر عدّل البيانات بعد محاولة فاشلة → ID جديد (عشان التعديل ما يتتجاهلش كـ "Already saved")
+  const sig = JSON.stringify(core);
+  if (currentSubmissionId && lastSubmitSig && sig !== lastSubmitSig) {
+    removePending(currentSubmissionId);
+    currentSubmissionId = null;
+  }
+  lastSubmitSig = sig;
+
+  const data = Object.assign({
+    formVersion: FORM_VERSION,
+    submissionId: ensureSubmissionId(),
+    timestamp: formData.get('timestamp')
+  }, core);
+
   // ✅ Save locally BEFORE sending
   savePendingSubmission(data);
 
+  isSubmitting = true;
   submitBtn.disabled = true;
   setStatus('Submitting...', '');
 
@@ -916,8 +1016,9 @@ form.addEventListener('submit', async function (e) {
     });
     if (!result.ok) throw new Error(result.error || 'Server rejected the data.');
 
-    clearPendingSubmission();
+    removePending(data.submissionId);
     currentSubmissionId = null;
+    lastSubmitSig = null;
     showModal(getGulpMessage());
     form.reset();
     setTimestamp();
@@ -928,6 +1029,7 @@ form.addEventListener('submit', async function (e) {
   } catch (err) {
     setStatus('Failed ❌: ' + (err.message || 'Unexpected error.') + ' — Your data is saved locally, click Submit to try again.', 'error');
   } finally {
+    isSubmitting = false;
     submitBtn.disabled = false;
   }
 });
