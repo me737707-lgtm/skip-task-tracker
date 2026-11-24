@@ -51,6 +51,7 @@ textarea { min-height: 80px; resize: vertical; }
 input:focus, select:focus, textarea:focus { border-color: #4dabf7; background: rgba(255, 255, 255, 0.12); }
 small { color: #aaa; font-size: 0.8rem; display: block; margin-top: 5px; }
 select option { background: #1a1a2e; color: #fff; }
+select:disabled { opacity: 0.6; cursor: not-allowed; }
 .hidden-group { display: none; opacity: 0; max-height: 0; overflow: hidden; transition: all 0.3s ease; }
 .hidden-group.visible { display: block; opacity: 1; max-height: 500px; }
 .frames-container { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
@@ -248,7 +249,21 @@ label span { color: #ff6b6b; }
           <option value="Empty (0 Objects)">Empty (0 Objects)</option>
         </select>
       </div>
-      <div class="form-group full-width">
+      <!-- ✅ Skip Reasons (LIDAR / Lane Line): GULP Skip → Issue → Edge Case Description -->
+      <div class="form-group full-width hidden-group" id="gulpSkipGroup">
+        <label for="gulpSkip">GULP Skip <span>*</span></label>
+        <select id="gulpSkip"></select>
+      </div>
+      <div class="form-group full-width hidden-group" id="skipIssueGroup">
+        <label for="skipIssue">Issue <span>*</span></label>
+        <select id="skipIssue"></select>
+      </div>
+      <div class="form-group full-width hidden-group" id="skipDescGroup">
+        <label for="skipDesc">Edge Case Description <span>*</span></label>
+        <select id="skipDesc"></select>
+      </div>
+      <!-- القايمة القديمة (Image / Image segmentation) -->
+      <div class="form-group full-width" id="legacyIssueGroup">
         <label for="issue">Issue <span>*</span></label>
         <select id="issue" name="issue" required>
           <option value="" disabled selected>Select an issue...</option>
@@ -334,7 +349,7 @@ const MANUAL_URL = "https://script.google.com/macros/s/AKfycbxzbMr1FMIC3VEuJbCR2
 const CONFIG_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSfb848v42ECFY6rHIOGtVX4mIheiEQHDKNYpv4NTtcnQ2UuwbvY7aXp6Bci4U_hIihqH7xHgoi9F_L/pubhtml?gid=1278756710&single=true";
 
 // ✅ نسخة الفورم (الباك إند بيستخدمها عشان يطبّق شرط QA Case على الفورم الجديد بس)
-const FORM_VERSION = 11;
+const FORM_VERSION = 12;
 
 let API_URL = (INJECTED_URL && INJECTED_URL.indexOf("<?=") === -1) ? INJECTED_URL : MANUAL_URL;
 
@@ -364,6 +379,13 @@ const modalitySelect = document.getElementById('modality');
 const passSelect = document.getElementById('passStatus');
 const qaCaseGroup = document.getElementById('qaCaseGroup');
 const qaCaseSelect = document.getElementById('qaCase');
+const legacyIssueGroup = document.getElementById('legacyIssueGroup');
+const gulpSkipGroup = document.getElementById('gulpSkipGroup');
+const skipIssueGroup = document.getElementById('skipIssueGroup');
+const skipDescGroup = document.getElementById('skipDescGroup');
+const gulpSkipSelect = document.getElementById('gulpSkip');
+const skipIssueSelect = document.getElementById('skipIssue');
+const skipDescSelect = document.getElementById('skipDesc');
 const submitBtn = document.getElementById('submitBtn');
 const customModal = document.getElementById('customModal');
 const modalMessage = document.getElementById('modalMessage');
@@ -554,10 +576,182 @@ function applyQaLinkAutoFill() {
     passSelect.value = '';
     qaAutoFilled = false;
   }
+  updateIssueMode();
   toggleQaCase();
 }
 
 modalitySelect.addEventListener('change', toggleQaCase);
+
+/* =====================================================
+   ✅ Skip Reasons (من ملف Skip_Reasons.xlsx)
+   - LIDAR / Lane Line: GULP Skip → Issue → Edge Case Description (من الجدول تحت بالظبط).
+   - Image / Image segmentation: لسه بيستخدموا قايمة Issue القديمة زي ما هي.
+   - الـ Issue بيتسجل في عمود Issue، والوصف بيتسجل في Edge Case Description،
+     والـ GULP Skip في عمود GULP Skip، والوصف هو اللي بيظهر للنسخ في GULP.
+   - {start} و {end} بيتبدلوا بأرقام الـ frames اللي اليوزر بيدخلها.
+===================================================== */
+const NOT_A_FREEWAY_ISSUES = [
+  { issue: "Traffic Lights", descs: ["Traffic Lights: Traffic Light present Lidar range."] },
+  { issue: "Intersections", descs: ["Intersections: Road intersection present Lidar range."] },
+  { issue: "Driveways", descs: ["Driveways"] },
+  { issue: "Tollbooth", descs: ["Tollbooth: Tollbooth present in Lidar range."] }
+];
+
+const SKIP_REASONS = {
+  "Lane Line": [
+    { skip: "Other", issues: [
+      { issue: "edge case: Map issue", descs: [
+        "Map Issue: The surface/elevation data is corrupted, making it impossible to label that section accurately.",
+        "Missed information: Map visibility is occluded due to snow, rain, or obstructing objects, preventing accurate lane labeling."
+      ] },
+      { issue: "edge case: Tool issue", descs: [
+        "Tool Issue: Lane arrows are floating in the air (above the road surface)",
+        "Tool Issue: Arrows overlap other dashed lines and extend outside the lane boundaries"
+      ] }
+    ] },
+    { skip: "Not a Freeway", issues: NOT_A_FREEWAY_ISSUES }
+  ],
+  "LIDAR": [
+    { skip: "Not a Freeway", issues: NOT_A_FREEWAY_ISSUES },
+    { skip: "Lidar Points Shift Vertically", issues: [
+      { issue: "Lidar Points Shift Vertically", frames: true,
+        descs: ["Lidar points move up and down on frames {start}-{end}."] }
+    ] },
+    { skip: "Other", issues: [
+      { issue: "Lidar Shift Horizontally", frames: true,
+        descs: ["Lidar points move right and left on frames {start}-{end}."] },
+      { issue: "Degraded Lidar Returns",
+        descs: ["There is a duplicate of the same objects due to an issue with the sensors"] },
+      { issue: "Generated incorrectly",
+        descs: ["Auto-generated lanes overlap or deviate from road markings"] },
+      { issue: "edge case",
+        descs: ["edge case :Waiting on edge case response"] }
+    ] }
+  ]
+};
+
+let issueMode = 'legacy';      // 'legacy' | 'cascade'
+let issueModeKey = 'legacy:';
+
+function fillSelect(sel, placeholder, items, disabled) {
+  sel.innerHTML = '';
+  const ph = document.createElement('option');
+  ph.value = '';
+  ph.disabled = true;
+  ph.selected = true;
+  ph.textContent = placeholder;
+  sel.appendChild(ph);
+  items.forEach(function (it) {
+    const o = document.createElement('option');
+    o.value = it.value;
+    o.textContent = it.label;
+    sel.appendChild(o);
+  });
+  sel.disabled = !!disabled;
+}
+
+function currentSkipTable() { return SKIP_REASONS[taskTypeSelect.value] || null; }
+
+function findSkipGroup(skip) {
+  const t = currentSkipTable();
+  if (!t) return null;
+  return t.find(function (g) { return g.skip === skip; }) || null;
+}
+
+function findSkipIssue(skip, issue) {
+  const g = findSkipGroup(skip);
+  if (!g) return null;
+  return g.issues.find(function (i) { return i.issue === issue; }) || null;
+}
+
+function descLabel(d) { return d.split('{start}').join('X').split('{end}').join('Y'); }
+
+function setCascadeFrames(show) {
+  if (show) {
+    issuedFramesGroup.classList.add('visible');
+    frameStartInput.setAttribute('required', 'required');
+    frameEndInput.setAttribute('required', 'required');
+  } else {
+    issuedFramesGroup.classList.remove('visible');
+    frameStartInput.removeAttribute('required');
+    frameEndInput.removeAttribute('required');
+    frameStartInput.value = '';
+    frameEndInput.value = '';
+  }
+}
+
+function resetSkipFields() {
+  const t = currentSkipTable();
+  fillSelect(gulpSkipSelect, 'Select GULP Skip...',
+    t ? t.map(function (g) { return { value: g.skip, label: g.skip }; }) : [], !t);
+  fillSelect(skipIssueSelect, 'Select GULP Skip first...', [], true);
+  fillSelect(skipDescSelect, 'Select Issue first...', [], true);
+}
+
+function buildCascadeDescription() {
+  let d = skipDescSelect.value || '';
+  d = d.split('{start}').join(frameStartInput.value).split('{end}').join(frameEndInput.value);
+  return d.trim();
+}
+
+/* بيبدّل بين وضع الـ cascade (LIDAR / Lane Line) والوضع القديم (باقي الـ Task Types) */
+function updateIssueMode() {
+  const table = SKIP_REASONS[taskTypeSelect.value] || null;
+  const newMode = table ? 'cascade' : 'legacy';
+  const key = newMode + ':' + (table ? taskTypeSelect.value : '');
+  if (key === issueModeKey) return;
+  issueModeKey = key;
+  issueMode = newMode;
+
+  // تصفير الجانب القديم
+  issueSelect.value = '';
+  hideAllDynamicGroups();
+  frameStartInput.value = '';
+  frameEndInput.value = '';
+  edgeCaseSubIssueSelect.value = '';
+  edgeCaseDescInput.value = '';
+  otherSubIssueSelect.value = '';
+  otherReasonDescInput.value = '';
+
+  if (newMode === 'cascade') {
+    legacyIssueGroup.style.display = 'none';
+    issueSelect.removeAttribute('required');
+    resetSkipFields();
+    [gulpSkipGroup, skipIssueGroup, skipDescGroup].forEach(function (g) { g.classList.add('visible'); });
+    gulpSkipSelect.setAttribute('required', 'required');
+    skipIssueSelect.setAttribute('required', 'required');
+    skipDescSelect.setAttribute('required', 'required');
+  } else {
+    legacyIssueGroup.style.display = '';
+    issueSelect.setAttribute('required', 'required');
+    [gulpSkipGroup, skipIssueGroup, skipDescGroup].forEach(function (g) { g.classList.remove('visible'); });
+    gulpSkipSelect.removeAttribute('required');
+    skipIssueSelect.removeAttribute('required');
+    skipDescSelect.removeAttribute('required');
+  }
+}
+
+taskTypeSelect.addEventListener('change', updateIssueMode);
+
+gulpSkipSelect.addEventListener('change', function () {
+  const g = findSkipGroup(this.value);
+  setCascadeFrames(false);
+  fillSelect(skipIssueSelect, 'Select Issue...',
+    g ? g.issues.map(function (i) { return { value: i.issue, label: i.issue }; }) : [], !g);
+  fillSelect(skipDescSelect, 'Select Issue first...', [], true);
+});
+
+skipIssueSelect.addEventListener('change', function () {
+  const i = findSkipIssue(gulpSkipSelect.value, this.value);
+  setCascadeFrames(!!(i && i.frames));
+  if (!i) {
+    fillSelect(skipDescSelect, 'Select Issue first...', [], true);
+    return;
+  }
+  fillSelect(skipDescSelect, 'Select Description...',
+    i.descs.map(function (d) { return { value: d, label: descLabel(d) }; }), false);
+  if (i.descs.length === 1) skipDescSelect.value = i.descs[0];
+});
 
 /* ---------- Dynamic Groups ---------- */
 function hideAllDynamicGroups() {
@@ -693,6 +887,7 @@ function copyModalMessage() {
 
 /* الرسالة الافتراضية اتشالت: بترجع "" لو مفيش رسالة مخصوصة */
 function getGulpMessage() {
+  if (issueMode === 'cascade') return buildCascadeDescription();
   const issueVal = issueSelect.value;
   const start = frameStartInput.value;
   const end = frameEndInput.value;
@@ -913,6 +1108,13 @@ form.addEventListener('submit', async function (e) {
     return;
   }
 
+  // 5.6 Skip Reasons (LIDAR / Lane Line)
+  if (issueMode === 'cascade') {
+    if (!gulpSkipSelect.value) { setStatus('Error: Please select a GULP Skip reason.', 'error'); return; }
+    if (!skipIssueSelect.value) { setStatus('Error: Please select an Issue.', 'error'); return; }
+    if (!skipDescSelect.value) { setStatus('Error: Please select an Edge Case Description.', 'error'); return; }
+  }
+
   // 6. Frames
   if (issuedFramesGroup.classList.contains('visible')) {
     const start = parseInt(frameStartInput.value);
@@ -948,17 +1150,28 @@ form.addEventListener('submit', async function (e) {
   const finalUser = userResult.value;
   const finalLink = cleanTaskLink(taskLinkVal);
 
-  let finalIssue = formData.get('issue');
-  if (finalIssue === 'edge case') {
-    const subIssue = edgeCaseSubIssueSelect.value;
-    finalIssue = (subIssue === 'Other')
-      ? 'edge case: ' + edgeCaseDescInput.value.trim()
-      : 'edge case: ' + subIssue;
-  } else if (finalIssue === 'Other') {
-    const subIssue = otherSubIssueSelect.value;
-    finalIssue = (subIssue === 'Lidar points shifting vertically')
-      ? "Other: Lidar Points Shift Vertically"
-      : 'Other: ' + otherReasonDescInput.value.trim();
+  let finalIssue = '';
+  let finalSkip = '';
+  let finalEdgeDesc = '';
+  if (issueMode === 'cascade') {
+    // LIDAR / Lane Line: القيم زي الجدول بالظبط
+    finalSkip = gulpSkipSelect.value;
+    finalIssue = skipIssueSelect.value;
+    finalEdgeDesc = buildCascadeDescription();
+  } else {
+    finalIssue = formData.get('issue');
+    if (finalIssue === 'edge case') {
+      const subIssue = edgeCaseSubIssueSelect.value;
+      finalIssue = (subIssue === 'Other')
+        ? 'edge case: ' + edgeCaseDescInput.value.trim()
+        : 'edge case: ' + subIssue;
+    } else if (finalIssue === 'Other') {
+      const subIssue = otherSubIssueSelect.value;
+      finalIssue = (subIssue === 'Lidar points shifting vertically')
+        ? "Other: Lidar Points Shift Vertically"
+        : 'Other: ' + otherReasonDescInput.value.trim();
+    }
+    finalEdgeDesc = edgeCaseDescInput.value.trim() || "";
   }
 
   let finalFrames = "";
@@ -982,9 +1195,10 @@ form.addEventListener('submit', async function (e) {
     passStatus: formData.get('passStatus'),
     issue: finalIssue,
     issuedFrames: finalFrames,
-    edgeCaseDesc: edgeCaseDescInput.value.trim() || "",
+    edgeCaseDesc: finalEdgeDesc,
     shift: formData.get('shift'),
-    qaCase: finalQaCase
+    qaCase: finalQaCase,
+    gulpSkip: finalSkip
   };
 
   // ✅ لو اليوزر عدّل البيانات بعد محاولة فاشلة → ID جديد (عشان التعديل ما يتتجاهلش كـ "Already saved")
@@ -1024,6 +1238,7 @@ form.addEventListener('submit', async function (e) {
     setTimestamp();
     hideAllDynamicGroups();
     qaAutoFilled = false;
+    updateIssueMode();
     toggleQaCase();
     setStatus('', '');
   } catch (err) {
@@ -1033,6 +1248,9 @@ form.addEventListener('submit', async function (e) {
     submitBtn.disabled = false;
   }
 });
+
+// ✅ حالة البداية
+updateIssueMode();
 </script>
 </body>
 </html>
