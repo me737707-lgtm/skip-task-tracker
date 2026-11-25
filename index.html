@@ -893,6 +893,11 @@ function copyModalMessage() {
 
 /* الرسالة الافتراضية اتشالت: بترجع "" لو مفيش رسالة مخصوصة */
 function getGulpMessage() {
+  // ✅ QA Case: لو اخترت واحدة من الاتنين دول، هي نفسها الرسالة اللي تتكوبي (وبتاخد أولوية على أي رسالة تانية)
+  // لو اخترت "None" بيكمّل بالمنطق العادي تحت
+  const qaMsg = (modalitySelect.value === 'LIDAR QA') ? qaCaseSelect.value : '';
+  if (qaMsg === 'Incomplete task need extra time' || qaMsg === 'Empty (0 Objects)') return qaMsg;
+
   if (issueMode === 'cascade') return buildCascadeDescription();
   const issueVal = issueSelect.value;
   const start = frameStartInput.value;
