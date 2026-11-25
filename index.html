@@ -314,6 +314,11 @@ label span { color: #ff6b6b; }
           </div>
         </div>
       </div>
+      <!-- ✅ More Description — نص حر من اليوزر (عربي أو إنجليزي) -->
+      <div class="form-group full-width">
+        <label for="moreDescription">More Description</label>
+        <textarea id="moreDescription" name="moreDescription" dir="auto" maxlength="1000" placeholder="Write more details about the reason here (Arabic or English)..."></textarea>
+      </div>
       <div class="full-width">
         <button type="submit" id="submitBtn">Submit Report</button>
       </div>
@@ -349,7 +354,7 @@ const MANUAL_URL = "https://script.google.com/macros/s/AKfycbxzbMr1FMIC3VEuJbCR2
 const CONFIG_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSfb848v42ECFY6rHIOGtVX4mIheiEQHDKNYpv4NTtcnQ2UuwbvY7aXp6Bci4U_hIihqH7xHgoi9F_L/pubhtml?gid=1278756710&single=true";
 
 // ✅ نسخة الفورم (الباك إند بيستخدمها عشان يطبّق شرط QA Case على الفورم الجديد بس)
-const FORM_VERSION = 12;
+const FORM_VERSION = 13;
 
 let API_URL = (INJECTED_URL && INJECTED_URL.indexOf("<?=") === -1) ? INJECTED_URL : MANUAL_URL;
 
@@ -386,6 +391,7 @@ const skipDescGroup = document.getElementById('skipDescGroup');
 const gulpSkipSelect = document.getElementById('gulpSkip');
 const skipIssueSelect = document.getElementById('skipIssue');
 const skipDescSelect = document.getElementById('skipDesc');
+const moreDescInput = document.getElementById('moreDescription');
 const submitBtn = document.getElementById('submitBtn');
 const customModal = document.getElementById('customModal');
 const modalMessage = document.getElementById('modalMessage');
@@ -1143,6 +1149,10 @@ form.addEventListener('submit', async function (e) {
   // 9. Other sub-selection
   if (issueSelect.value === 'Other' && !otherSubIssueSelect.value) { setStatus('Error: Please select a specific type for Other.', 'error'); return; }
 
+  // 10. More Description (اختياري — عربي أو إنجليزي)
+  const moreVal = moreDescInput.value.trim().slice(0, 1000);
+  if (containsUrl(moreVal)) { setStatus('Error: Links are not allowed in More Description.', 'error'); return; }
+
   // ---------- Data Preparation ----------
   const formData = new FormData(form);
   const finalLabelerName = formatNameCase(labelerVal);
@@ -1198,7 +1208,8 @@ form.addEventListener('submit', async function (e) {
     edgeCaseDesc: finalEdgeDesc,
     shift: formData.get('shift'),
     qaCase: finalQaCase,
-    gulpSkip: finalSkip
+    gulpSkip: finalSkip,
+    moreDescription: moreVal
   };
 
   // ✅ لو اليوزر عدّل البيانات بعد محاولة فاشلة → ID جديد (عشان التعديل ما يتتجاهلش كـ "Already saved")
